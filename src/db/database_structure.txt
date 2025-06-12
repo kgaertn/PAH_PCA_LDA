@@ -1,0 +1,32 @@
+experiment
+├── id (PK)
+├── name
+├── data_state
+
+participant
+├── id (PK)
+├── experiment_id (FK)
+├── age
+├── height_cm
+├── weight_kg
+├── instrument
+├── PRMD_shoulder_neck_right
+├── PRMD_shoulder_neck_left
+├── PRMD_upper_arm_right
+├── PRMD_upper_arm_left
+├── PRMD_ever
+
+measurement
+├── id (PK)
+├── participant_id (FK)
+├── timepoint TEXT             -- z. B. "T1", "T2"
+├── device TEXT                -- z. B. "emg", "mocap"
+├── target TEXT                -- z. B. "m. biceps brachii"
+├── unit TEXT
+
+datapoint
+├── id (PK)
+├── measurement_id (FK)
+├── bow_stroke TEXT             -- z. B. "T1", "T2"
+├── time_point TEXT                -- z. B. "emg", "mocap"
+├── value REAL
