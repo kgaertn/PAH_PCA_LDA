@@ -3,7 +3,7 @@ from typing import List, Optional
 
 @dataclass
 class Experiment:
-    id: str
+    id: int
     name: str
     data_state: str
     data_folder: Optional[str] = None

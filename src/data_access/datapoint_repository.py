@@ -20,9 +20,9 @@ class DatapointRepository:
         """
         cursor = self.conn.cursor()
         cursor.execute("""
-            INSERT INTO datapoint (measurement_id, bow_stroke, up_down, time_point, value)
+            INSERT INTO datapoint (measurement_id, bow_stroke, up_down, key, time_point, value)
             VALUES (?, ?, ?, ?, ?)
-        """, (datapoint.measurement_id, datapoint.bow_stroke, datapoint.up_down, datapoint.time_point, 
+        """, (datapoint.measurement_id, datapoint.bow_stroke, datapoint.up_down, datapoint.key, datapoint.time_point, 
               datapoint.value))
         self.conn.commit()
         
@@ -41,9 +41,9 @@ class DatapointRepository:
         
         cursor = self.conn.cursor()
         cursor.executemany("""
-        INSERT INTO datapoint (measurement_id, bow_stroke, up_down, time_point, value)
+        INSERT INTO datapoint (measurement_id, bow_stroke, up_down, key, time_point, value)
         VALUES (?, ?, ?, ?, ?)
-        """, [(dp.measurement_id, dp.bow_stroke, dp.up_down, dp.time_point, dp.value) for dp in datapoints])
+        """, [(dp.measurement_id, dp.bow_stroke, dp.up_down, dp.key, dp.time_point, dp.value) for dp in datapoints])
         self.conn.commit()
 # endregion Setter
 
@@ -80,7 +80,12 @@ class DatapointRepository:
                 measurement.target,
                 measurement.axis,
                 measurement.unit,
-                datapoint.*
+                datapoint.id AS datapoint_id,
+                datapoint.bow_stroke,
+                datapoint.up_down,
+                datapoint.key,
+                datapoint.time_point AS dp_time_point,
+                datapoint.value
             FROM datapoint
             JOIN measurement ON datapoint.measurement_id = measurement.id
             JOIN participant ON measurement.participant_id = participant.id
@@ -128,6 +133,7 @@ class DatapointRepository:
                 datapoint.id AS datapoint_id,
                 datapoint.bow_stroke,
                 datapoint.up_down,
+                datapoint.key,
                 datapoint.time_point AS dp_time_point,
                 datapoint.value
             FROM datapoint
@@ -178,6 +184,7 @@ class DatapointRepository:
                 datapoint.id AS datapoint_id,
                 datapoint.bow_stroke,
                 datapoint.up_down,
+                datapoint.key,
                 datapoint.time_point AS dp_time_point,
                 datapoint.value
             FROM datapoint
@@ -222,6 +229,7 @@ class DatapointRepository:
                 datapoint.id AS datapoint_id,
                 datapoint.bow_stroke,
                 datapoint.up_down,
+                datapoint.key,
                 datapoint.time_point AS dp_time_point,
                 datapoint.value
             FROM datapoint
@@ -272,6 +280,7 @@ class DatapointRepository:
                 datapoint.id AS datapoint_id,
                 datapoint.bow_stroke,
                 datapoint.up_down,
+                datapoint.key,
                 datapoint.time_point AS dp_time_point,
                 datapoint.value
             FROM datapoint
@@ -300,6 +309,7 @@ class DatapointRepository:
                 - measurement_id
                 - bow_stroke
                 - up_down
+                - key
                 - time_point
                 - value
             If no matching datapoint is found, returns None.
@@ -310,7 +320,7 @@ class DatapointRepository:
         row = cursor.fetchone()
         if row:
             return Datapoint(id=row["id"], measurement_id=row["measurement_id"], bow_stroke=row["bow_stroke"],
-                             up_down=row["up_down"], time_point=row["time_point"], value=row["value"])
+                             up_down=row["up_down"], key = row["key"], time_point=row["time_point"], value=row["value"])
         return None
     
 # endregion Getter

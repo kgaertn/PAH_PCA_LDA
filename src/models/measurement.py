@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Measurement:
-    id: str
+    id: int
     participant_id: str
     timepoint: str
     device: str                         

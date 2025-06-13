@@ -1,10 +1,11 @@
 from dataclasses import dataclass
-#from typing import List, Optional
 
 @dataclass
 class Datapoint:
-    measurement_id: str
-    bow_stroke: str
-    up_down: str
-    time_point: str
+    id: int
+    measurement_id: int
+    bow_stroke: int
+    up_down: int
+    key:str
+    time_point: int
     value: float

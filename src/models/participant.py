@@ -3,9 +3,9 @@ from typing import List, Optional
 
 @dataclass
 class Participant:
-    id: str 
+    id: int 
     participant_id: str
-    experiment_id: str
+    experiment_id: int
     age: Optional[int] = None
     height_cm: Optional[float] = None
     weight_kg: Optional[float] = None
