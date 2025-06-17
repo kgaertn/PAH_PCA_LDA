@@ -1,128 +1,154 @@
 #from data_access.datapoint_repository import DatapointRepository
 from data_processing.data_preprocess import DataProcessor
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from scipy.stats import ttest_ind
+from data_processing.pca_analysis import PCAAnalyser
+
+#from sklearn.decomposition import PCA
+#from scipy.stats import ttest_ind
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 def main():
 
     data_processor = DataProcessor()
+    pca_analyser = PCAAnalyser()
     df = data_processor.load_data_one_joint('right elbow joint angle')
-    pain_columns = ['PRMD_shoulder_neck_right', 'PRMD_shoulder_neck_left']
-    control_column = 'PRMD_ever'
-    df_reduced = data_processor.select_pain_data(df, pain_columns, control_column)
-    
+    #df = data_processor.load_full_device_data('mocap')
+    unique_target_axes = df[["target", "axis"]].drop_duplicates().values.tolist()
+    pcs_final_stand = []
+    pcs_final_orig = []
+    df_combined_stand = pd.DataFrame()
+    df_combined_orig = pd.DataFrame()
+    df_combined_strokes = pd.DataFrame()
+    df_mean_key_total = pd.DataFrame()
+    for target, axis in unique_target_axes:
+        df_target_axis = df[(df['target'] == target) & (df['axis'] == axis)]
+        pain_columns = ['PRMD_shoulder_neck_right', 'PRMD_shoulder_neck_left']
+        control_column = 'PRMD_ever'
+        df_reduced = data_processor.select_pain_data(df_target_axis, pain_columns, control_column)
 
-
-    df_sorted = df_reduced.sort_values(by=['participant_id', 'bow_stroke', 'up_down', 'dp_time_point'])    
-    # substract meanwave of the played note
-    df_key_normalized = data_processor.substract_meanwave_key(df_sorted)
-    print("")    
-
-    # combine half-cycles into full-cycle, transform data (each dp_timepoint into one column) 
-    df_combined_strokes = data_processor.combine_half_strokes_to_full_cycles(df_key_normalized)
-    df_transformed = data_processor.pivot_full_cycles_to_wide(df_combined_strokes, 'value_centered' )
-    df_pca = df_transformed.iloc[:, -202:]
-    df_part = df_transformed.iloc[:, :3]
-
-    # TODO: Standardize data -> compare with unstandardized, to see which fits out analytical goals better!
-    scaler = StandardScaler()
-    scaled_df = scaler.fit_transform(df_pca)
-    
-    # Apply PCA
-    # PCA standardized data
-    pca_stand = PCA()
-    principal_components_stand = pca_stand.fit(scaled_df)
-    
-    # PCA original data
-    pca_orig = PCA()
-    principal_components_orig = pca_orig.fit(df_pca)
-    
-    # examine explained variance 
-    # for standardized data
-    cumulative_variance_stand = np.cumsum(pca_stand.explained_variance_ratio_)
-    k_stand = np.argmax(cumulative_variance_stand >= 0.9) + 1
-    # for original data
-    cumulative_variance_orig = np.cumsum(pca_orig.explained_variance_ratio_)
-    k_orig = np.argmax(cumulative_variance_orig >= 0.9) + 1    
-    
-    # apply PCA with k components
-    # standardized data
-    pca_final_stand = PCA(n_components=k_stand)
-    pca_reduced_stand = pca_final_stand.fit_transform(scaled_df)
-    df_pca_reduced_stand = pd.DataFrame(pca_reduced_stand, columns=[f"PC{int(col)}" for col in range(1,k_stand+1)])    
-    # original data
-    pca_final_orig = PCA(n_components=k_orig)
-    pca_reduced_orig = pca_final_orig.fit_transform(df_pca)
-    df_pca_reduced_orig = pd.DataFrame(pca_reduced_orig, columns=[f"PC{int(col)}" for col in range(1,k_orig+1)])    
-    
-    # concat the two dataframes
-    df_combined_stand = pd.concat([df_part, df_pca_reduced_stand], axis=1)
-    df_combined_orig = pd.concat([df_part, df_pca_reduced_orig], axis=1)
-    print("")
-    
-    # TODO: t-test
-    # standardized
-    #t_stat, p_value = ttest_ind(gruppe1, gruppe2, equal_var=False) 
-    # calculate mean PC score per participant for t-test, to avoid participants being over-represented
-    pc_cols = df_combined_stand.iloc[:, 3:]
-    for pc in pc_cols:
+        df_sorted = df_reduced.sort_values(by=['participant_id', 'bow_stroke', 'up_down', 'dp_time_point'])    
+        # substract meanwave of the played note
+        df_key_normalized, df_mean_key_waveform_target_axis = data_processor.subtract_meanwave_key(df_sorted)
+        df_mean_key_waveform_target_axis.insert(0, 'axis', axis)
+        df_mean_key_waveform_target_axis.insert(0, 'target', target)
+        df_mean_key_total = pd.concat([df_mean_key_total, df_mean_key_waveform_target_axis])
         
-        df_pc_mean_stand = df_combined_stand.groupby(['participant_id', 'PRMD_ever'])[pc].mean().reset_index()
-        df_mean_pain = df_pc_mean_stand[df_pc_mean_stand['PRMD_ever'] == 1][pc]
-        df_mean_nopain = df_pc_mean_stand[df_pc_mean_stand['PRMD_ever'] == 0][pc]
+        # combine half-cycles into full-cycle, transform data (each dp_timepoint into one column) 
+        df_combined_strokes_target_axis = data_processor.combine_half_strokes_to_full_cycles(df_key_normalized)
+        df_transformed = data_processor.pivot_full_cycles_to_wide(df_combined_strokes_target_axis, 'value_centered' )
+        df_pca = df_transformed.iloc[:, -202:]
+        df_part = df_transformed.iloc[:, :5]
+        df_combined_strokes = pd.concat([df_combined_strokes, df_combined_strokes_target_axis], axis = 0)
+        # TODO: Standardize data -> compare with unstandardized, to see which fits out analytical goals better!
+        scaled_df=pca_analyser.standardize_df(df_pca)
         
-        t_stat, p_value = ttest_ind(df_mean_pain, df_mean_nopain, equal_var=False)
-        print(f"PC: {pc} \t| t-value: {t_stat} \t| p-value: {p_value}")
+        # Apply PCA
+        # standaradized data
+        variance_level = 0.9
+        cumulative_variance_stand, k_stand, pca_final_stand, pca_scores_stand, df_pca_scores_stand = pca_analyser.apply_pca(scaled_df, variance_level)
+        # original data
+        #cumulative_variance_orig, k_orig, pca_final_orig, pca_reduced_orig, df_pca_reduced_orig = pca_analyser.apply_pca(df_pca, variance_level)
+        
+        # TODO: save the PCs for the most relevant features
+        pcs_final_stand.append([target, axis, pca_final_stand])
+        #pcs_final_orig.append([target, axis, pca_final_orig])
+        
+        # concat the participants and pca dataframes
+        df_part_pca_combined_stand = pd.concat([df_part, df_pca_scores_stand], axis=1)
+        #df_part_pca_combined_orig = pd.concat([df_part, df_pca_reduced_orig], axis=1)
+        
+        df_combined_stand = pd.concat([df_combined_stand, df_part_pca_combined_stand], axis=0)
+        #df_combined_orig = pd.concat([df_combined_orig, df_part_pca_combined_orig], axis=0)
+        
+    pcs_final_stand = pd.DataFrame(pcs_final_stand, columns = ['target', 'axis', 'PCA'])        
+    #pcs_final_orig = pd.DataFrame(pcs_final_orig, columns = ['target', 'axis', 'PCA'])    
 
     
-    print("")
+    # rank pcs
     
+    pcs_ranked_stand = pca_analyser.rank_pcs(unique_target_axes, df_combined_stand)
+    #pcs_ranked_orig = pca_analyser.rank_pcs(unique_target_axes, df_combined_orig)
     
-    # original 
+    max_pcs = 10
+    nr_pcs = len(pcs_ranked_stand) if len(pcs_ranked_stand) < max_pcs else max_pcs
     
+    # calculate mean waveform per pc (standardized)
+    for i in range(0, nr_pcs):
+        current_pc = pcs_ranked_stand.iloc[i]
+        target = current_pc['target']
+        axis = current_pc['axis']
+        pca_scores_stand = np.array(df_combined_stand[(df_combined_stand['target'] == target) & (df_combined_stand['axis'] == axis)][['PC1', 'PC2', 'PC3']])
+        df_pca_scores_stand = df_combined_stand[(df_combined_stand['target'] == target) & (df_combined_stand['axis'] == axis)]
+        df_mean_key_target_axis = df_mean_key_total[(df_mean_key_total['target'] == target) & (df_mean_key_total['axis'] == axis)]
+        # TODO: reconstruct the data from the pc_scores, loading vector and mean note
+        
+        
+        # TODO: instead of using the original data, multiply the pc scores with the loading vector, then add the mean waveform of the note
+        #df_target_axis = data_processor.pivot_full_cycles_to_wide(
+        #    df_combined_strokes[(df_combined_strokes['target'] == target) & (df_combined_strokes['axis'] == axis)], 
+        #    'value')
+         
+        component_reconstruction_data_stand = pca_analyser.reconstruct_single_component(current_pc, pcs_final_stand, 
+                                                                                        pca_scores_stand, df_target_axis, df_mean_key_target_axis)
+        pc_name = current_pc['PC']
+        title_reconstruction = f'Single component reconstruction: Rank {i+1}, {target}; {pc_name}'
+        title_loading_vector = f'Loading vector: Rank {i+1} {target}; {pc_name}'
+        fig_stand, axs_stand = pca_analyser.plot_PCA_reconstruction(component_reconstruction_data_stand, title_reconstruction, title_loading_vector)
+               
+        current_path = Path.cwd()
+        output_path = current_path / "output" / "plots"
+        rank = i+1
+        pca_analyser.save_plot(fig_stand, output_path, f"Rank_{rank}{target}_{axis}_{current_pc['PC']}_stand")
+        
+    # calculate mean waveform per pc (original)
+    pcs_ranked_orig = pca_analyser.rank_pcs(unique_target_axes, df_combined_orig)
     
-    # TODO: single component reconstruction 
-    # standardized
-    # calculate the mean waveform for the two groups (pain/no pain)
-    df_transformed_orig = data_processor.pivot_full_cycles_to_wide(df_combined_strokes, 'value' )
-    df_matrix_pain = np.array(df_transformed_orig[df_transformed_orig['PRMD_ever'] == 1].iloc[:, -202:])
-    df_matrix_no_pain = np.array(df_transformed_orig[df_transformed_orig['PRMD_ever'] == 0].iloc[:, -202:])
-    df_matrix = np.array(df_transformed_orig.iloc[:, -202:])
+    max_pcs = 10
+    nr_pcs = len(pcs_ranked_orig) if len(pcs_ranked_orig) < max_pcs else max_pcs
     
-    
-    
-    mean_waveform_pain = np.mean(df_matrix_pain, axis=0)
-    mean_waveform_no_pain = np.mean(df_matrix_no_pain, axis=0)
-    mean_waveform = np.mean(df_matrix, axis=0)
-    # select the PC and its loading vector
-    pc_idx = 2  # 0 for PC1
-    loading_vector = pca_final_stand.components_[pc_idx]  # shape: (n_timepoints,)
-    # get the 5th and 95th percentile of PC scores
-    pc_scores = pca_reduced_orig[:, pc_idx]
-    lower_percentile = np.percentile(pc_scores, 5)
-    upper_percentile = np.percentile(pc_scores, 95)
-    # scale the loading vector and create reconstructions
-    lower_band = mean_waveform + lower_percentile * loading_vector
-    upper_band = mean_waveform + upper_percentile * loading_vector
-    # plot everything
-    plt.figure(figsize=(10, 6))
-    plt.plot(mean_waveform_pain, label='Mean Waveform', color='black')
-    plt.plot(mean_waveform_no_pain, label='Mean Waveform', color='black')
-    plt.plot(mean_waveform, label='Mean Waveform', color='black')
-    plt.plot(lower_band, label='Mean + 5th percentile PC1', linestyle='--', color='blue')
-    plt.plot(upper_band, label='Mean + 95th percentile PC1', linestyle='--', color='red')
-    plt.figure(figsize=(10, 6))
-    plt.plot(loading_vector, label='PC1 Loading Vector (scaled)', linestyle=':', color='green')
-    plt.xlabel('Timepoint')
-    plt.ylabel('Amplitude')
-    plt.title('Single Component Reconstruction and PC1 Loading Vector')
-    plt.legend()
-    plt.show()
-    # original 
+    #for i in range(0, nr_pcs):
+    #    current_pc = pcs_ranked_orig.iloc[i]
+    #    target = current_pc['target']
+    #    axis = current_pc['axis']
+    #    pca_reduced_orig= np.array(df_combined_stand[(df_combined_stand['target'] == target) & (df_combined_stand['axis'] == axis)][['PC1', 'PC2', 'PC3']])
+    #    df_target_axis = data_processor.pivot_full_cycles_to_wide(
+    #        df_combined_strokes[(df_combined_strokes['target'] == target) & (df_combined_strokes['axis'] == axis)], 
+    #        'value')
+#
+    #    component_reconstruction_data_orig = pca_analyser.reconstruct_single_component(current_pc, pcs_final_orig, pca_reduced_orig, df_target_axis)
+    #    pc_name = current_pc['PC']
+    #    rank = i+1
+    #    title_reconstruction = f'Single component reconstruction: Rank {rank}, {target}; {pc_name}'
+    #    title_loading_vector = f'Loading vector: Rank {i+1} {target}; {pc_name}'
+    #    fig_orig, axs_orig = pca_analyser.plot_PCA_reconstruction(component_reconstruction_data_orig, rank)
+#
+    #    current_path = Path.cwd()
+    #    output_path = current_path / "output" / "plots"
+    #    pca_analyser.save_plot(fig_orig, output_path, f"{target}_{axis}_{current_pc['PC']}_orig")
+#
+    #pcs_ranked_stand = pca_analyser.rank_pcs(unique_target_axes, df_combined_stand)
+    ##pcs_ranked_orig = pca_analyser.rank_pcs(unique_target_axes, df_combined_orig)
+    #
+    #max_pcs = 10
+    #nr_pcs = len(pcs_ranked_stand) if len(pcs_ranked_stand) < max_pcs else max_pcs
+    #
+    ## calculate mean waveform per pc (standardized)
+    #for i in range(0, nr_pcs):
+    #    current_pc = pcs_ranked_stand.iloc[i]
+    #    target = current_pc['target']
+    #    axis = current_pc['axis']
+    #    df_target_axis = df_transformed[(df_transformed['target'] == target) & (df_transformed['axis'] == axis)]
+#
+    #    component_reconstruction_data_stand = pca_analyser.reconstruct_single_component(current_pc, pcs_final_stand, pca_scores_stand, df_target_axis)
+#
+    #    fig_stand, axs_stand = pca_analyser.plot_PCA_reconstruction(component_reconstruction_data_stand)
+    #           
+    #    current_path = Path.cwd()
+    #    output_path = current_path / "output" / "plots"
+    #    pca_analyser.save_plot(fig_stand, output_path, f"{target}_{axis}_{current_pc['PC']}_norm_stand")  
+
     
 if __name__ == '__main__':
     main()

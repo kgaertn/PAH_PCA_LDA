@@ -3,6 +3,7 @@ from data_access.participant_repository import ParticipantRepository
 from data_access.measurement_repository import MeasurementRepository
 from data_access.datapoint_repository import DatapointRepository
 
+
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -60,7 +61,7 @@ class DataProcessor:
                     combined = combined.sort_values(["up_down", "dp_time_point"]).reset_index(drop=True)
                     combined["dp_time_point"] = range(202)
                     combined["full_stroke"] = full_stroke_index
-                    result_rows.append(combined[["participant_id",'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left', "PRMD_ever",
+                    result_rows.append(combined[["participant_id",'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left', "PRMD_ever", "target", "axis",
                                                  'bow_stroke', "full_stroke", 'up_down', "dp_time_point",'value', 'mean_value', "value_centered"]])
                     full_stroke_index += 1
 
@@ -85,19 +86,24 @@ class DataProcessor:
         """
         # Pivot the table: each time point becomes a column
         wide_df = df.pivot_table(
-            index=["participant_id", "PRMD_ever", "full_stroke"],
+            index=["participant_id", "PRMD_ever", "full_stroke", 'target', 'axis'],
             columns="dp_time_point",
             values= value
         ).reset_index()
 
         # Optionally: Rename columns to indicate time points (e.g., t0, t1, ..., t201)
-        wide_df.columns = ['participant_id', 'PRMD_ever', 'full_stroke', ] + [f"t{int(col)}" for col in wide_df.columns[3:]]
+        wide_df.columns = ['participant_id', 'PRMD_ever', 'full_stroke', 'target', 'axis'] + [f"t{int(col)}" for col in wide_df.columns[5:]]
 
         return wide_df
     
     def load_data_one_joint(self, joint:str) -> pd.DataFrame:
         df = self.dp_repo.get_datapoints_by_exp_id_device_timepoint_target(1, 'mocap', 'pre', joint)
-        df_reduced = df[['participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever', 'bow_stroke', 'up_down', 'key', 'dp_time_point', 'value']]
+        df_reduced = df[['participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever', 'target', 'axis', 'bow_stroke', 'up_down', 'key', 'dp_time_point', 'value']]
+        return df_reduced
+    
+    def load_full_device_data(self, device:str) -> pd.DataFrame:
+        df = self.dp_repo.get_datapoints_by_exp_id_device_and_timepoint(1, device, 'pre')
+        df_reduced = df[['participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever', 'target', 'axis', 'bow_stroke', 'up_down', 'key', 'dp_time_point', 'value']]
         return df_reduced
     
     @staticmethod
@@ -116,32 +122,25 @@ class DataProcessor:
         final_mask = pain_mask | control_mask
 
         return df[final_mask]
-    
-    #@classmethod
-    #def calculate_key_meanwave(cls):
         
-    
-    #@classmethod
-    #def calculate_key_meanwaves(cls):
-        
-        
-    
     @staticmethod
-    def substract_meanwave_key(df:pd.DataFrame):
+    def subtract_meanwave_key(df:pd.DataFrame):
         df_mean = pd.DataFrame(columns=['bow_stroke', 'key', 'dp_time_point', 'mean_value'])
         unique_bow_stroke = df['bow_stroke'].unique()
+        mean_key_waveform = []
         for bow_stroke in unique_bow_stroke:
             bs_df = df[df['bow_stroke'] == bow_stroke]
             for time_point in range(0,101):
                 key_timepoint_df = bs_df[bs_df['dp_time_point'] == time_point]
                 mean_timepoint_value = key_timepoint_df['value'].mean()
                 df_mean.loc[len(df_mean)] = [bow_stroke, key_timepoint_df['key'].unique()[0], time_point, mean_timepoint_value]
-        
+                mean_key_waveform.append([key_timepoint_df['key'].unique()[0], bow_stroke, time_point, mean_timepoint_value])    
+                
         df_merged = df.merge(df_mean, on=['bow_stroke', 'key', 'dp_time_point'])
         df_merged['value_centered'] = df_merged['value'] - df_merged['mean_value']
-        df_result = df_merged[['participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever', 'bow_stroke', 'up_down', 
+        df_result = df_merged[['participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever','target', 'axis', 'bow_stroke', 'up_down', 
                                'key', 'dp_time_point', 'value', 'mean_value', 'value_centered']]
-        return df_result
-        
+        df_mean_key_waveform = pd.DataFrame(mean_key_waveform, columns = ['key', 'bow_stroke', 'time_point', 'mean_value'])
+        return df_result, df_mean_key_waveform
     
         
