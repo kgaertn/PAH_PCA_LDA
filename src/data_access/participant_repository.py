@@ -92,8 +92,7 @@ class ParticipantRepository:
 
         columns = [desc[0] for desc in cursor.description]
         return pd.DataFrame(rows, columns=columns)     
-        
-    
+     
     def get_participant_by_id(self, participant_id: int) -> Participant | None:
         """
         Retrieves a participant by their internal database ID.

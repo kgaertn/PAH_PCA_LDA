@@ -4,7 +4,11 @@
 ### PAH_PCA_LDA/
 ### ├── data/                           # database location
 ### ├── src/
-### │   ├── main.py                     
+### │   ├── main.py     
+### │   ├── processing/                # Data processing Layer (These classes the data (pre-)processing)
+### │   │   └── data_preprocess.py
+### │   │   └── pca_analysis.py
+### │   │   └── lda_analysis.py              
 ### │   ├── data_access/                # Data Access Layer (These classes handle the database access)
 ### │   │   └── experiment_repository.py
 ### │   │   └── participant_repository.py

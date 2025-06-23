@@ -65,7 +65,6 @@ class ExperimentRepository:
         columns = [description[0] for description in cursor.description]
         return pd.DataFrame(rows, columns=columns)
     
-    
     def get_experiment_by_id(self, experiment_id: int) -> Experiment | None:
         """
         Retrieves an experiment by its database ID.
@@ -83,8 +82,6 @@ class ExperimentRepository:
             return Experiment(id=row["id"], name=row["name"], data_state=row["data_state"], 
                               data_folder = row["data_folder"], upload_complete = row["upload_complete"])
         return None
-    
-    
     
     def get_experiment_id_by_name(self, experiment_name: str) -> int | None:
         """
