@@ -1,7 +1,10 @@
 from data_access.experiment_repository import ExperimentRepository
 from data_access.participant_repository import ParticipantRepository
 from data_access.measurement_repository import MeasurementRepository
+from data_access.sample_repository import SampleRepository
 from data_access.datapoint_repository import DatapointRepository
+
+from models.sample import Sample
 
 import pandas as pd
 
@@ -13,6 +16,7 @@ class DataProcessor:
         self.exp_repo = ExperimentRepository()
         self.part_repo = ParticipantRepository()
         self.meas_repo = MeasurementRepository()
+        self.samp_repo = SampleRepository()
         self.dp_repo = DatapointRepository()   
     
     def load_data_one_joint(self, joint:str) -> pd.DataFrame:
@@ -20,7 +24,7 @@ class DataProcessor:
         Load and filter datapoints for a specific joint from the 'mocap' device
         at the 'pre' timepoint of experiment ID 1.
 
-        Parameters:
+        Args:
             joint (str): The name of the joint to retrieve data for.
 
         Returns:
@@ -36,7 +40,7 @@ class DataProcessor:
         Load and filter all datapoints for a given device at the 'pre' timepoint
         of experiment ID 1.
 
-        Parameters:
+        Args::
             device (str): The name of the device to retrieve data from.
 
         Returns:
@@ -46,13 +50,87 @@ class DataProcessor:
         df = self.dp_repo.get_datapoints_by_exp_id_device_and_timepoint(1, device, 'pre')
         df_reduced = df[['participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever', 'target', 'axis', 'bow_stroke', 'up_down', 'key', 'dp_time_point', 'value']]
         return df_reduced
+    
+    # TODO: create samples
+    # TODO: upload sample info to DB
+    
+    def create_samples(self):
+        measurement_ids = self.meas_repo.get_existing_measurement_ids()
+        existing_samples = self.samp_repo.get_existing_samples()
+        for meas_id in measurement_ids:
+            df_meas = self.dp_repo.get_datapoints_by_meas_id(meas_id)
+            full_stroke_df = self.combine_half_strokes_to_full_cycles(df_meas)
+            full_strokes = full_stroke_df['full_stroke'].unique()
+            for stroke in full_strokes:
+                bow_stroke_start = min(full_stroke_df[full_stroke_df['full_stroke']==stroke]['bow_stroke'])
+                bow_stroke_end = max(full_stroke_df[full_stroke_df['full_stroke']==stroke]['bow_stroke'])
+                if (meas_id, bow_stroke_start) not in existing_samples:
+                    sample = Sample(
+                        id=full_strokes,
+                        measurement_id=meas_id,
+                        bow_stroke_start=bow_stroke_start,
+                        bow_stroke_end = bow_stroke_end
+                        )
+                    sample_id = self.samp_repo.insert_sample_by_measurement_id(sample)
+                    self.dp_repo.update_datapoints_sample(meas_id, bow_stroke_start, bow_stroke_end, sample_id)
+            print("")
+            
+        print("")
+    
+    @staticmethod
+    def combine_half_strokes_to_full_cycles(df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Efficiently combines up and down half-strokes into full strokes (202 points) per participant.
+        
+        Args:
+            df (pd.DataFrame): Input DataFrame with columns (among others):
+                - participant_id
+                - bow_stroke
+                - up_down
+                - dp_time_point
+                - value
+        Returns:
+            pd.DataFrame: DataFrame with combined full strokes:
+                - measurement_id
+                - bow_stroke
+                - full_stroke (index of the full stroke per participant)
+                - up_down
+                - dp_time_point (0–201)
+                - value   
+                - mean_value   
+                - value_centered   
+        """
+        result_rows = []
+
+        grouped = df.groupby(['bow_stroke', 'up_down'])
+
+        stroke_dict = {key: group for key, group in grouped}
+
+        full_stroke_index = 0
+
+        bow_strokes = sorted(df['bow_stroke'].unique())
+
+        for bs in bow_strokes:
+            up_half = stroke_dict.get((bs, 0))
+            down_half = stroke_dict.get((bs + 1, 1))
+
+            if up_half is not None and down_half is not None and len(up_half) == 101 and len(down_half) == 101:
+                combined = pd.concat([up_half, down_half], ignore_index=True)
+                combined = combined.sort_values(["up_down", "time_point"]).reset_index(drop=True)
+                combined["updated_time_point"] = range(202)
+                combined["full_stroke"] = full_stroke_index
+                result_rows.append(combined)
+                full_stroke_index += 1
+
+        return pd.concat(result_rows, ignore_index=True)
+    
     @staticmethod
     def select_pain_data(df:pd.DataFrame, pain_conditions:list[str], control_condition:str) -> pd.DataFrame:
         """
         Filter the DataFrame to include rows where at least one of the specified pain conditions is present,
         or where the control condition is fulfilled (i.e., equals 0).
 
-        Parameters:
+        Args:
             df (pd.DataFrame): The input DataFrame containing pain and control condition columns.
             pain_conditions (list[str]): A list of column names indicating binary pain conditions (1 = condition present).
             control_condition (str): The name of the column representing the control condition (0 = valid control).
@@ -76,7 +154,7 @@ class DataProcessor:
         Compute and subtract the mean waveform per (bow_stroke, key, dp_time_point) combination,
         and return both the centered data and the aggregated mean waveform.
 
-        Parameters:
+        Args:
             df (pd.DataFrame): The input DataFrame containing at least the columns:
                 'participant_id', 'PRMD_shoulder_neck_right', 'PRMD_shoulder_neck_left', 'PRMD_ever',
                 'target', 'axis', 'bow_stroke', 'up_down', 'key', 'dp_time_point', 'value'.
@@ -114,62 +192,62 @@ class DataProcessor:
         
         return df_result, df_mean_key_waveform
         
-    @staticmethod
-    def combine_half_strokes_to_full_cycles(df: pd.DataFrame) -> pd.DataFrame:
-        """
-        Efficiently combines up and down half-strokes into full strokes (202 points) per participant.
-        
-        Args:
-            df (pd.DataFrame): Input DataFrame with columns (among others):
-                - participant_id
-                - bow_stroke
-                - up_down
-                - dp_time_point
-                - value
-        Returns:
-            pd.DataFrame: DataFrame with combined full strokes:
-                - participant_id
-                - PRMD_shoulder_neck_right
-                - PRMD_shoulder_neck_left
-                - PRMD_ever
-                - target
-                - axis
-                - bow_stroke
-                - full_stroke (index of the full stroke per participant)
-                - up_down
-                - dp_time_point (0–201)
-                - value   
-                - mean_value   
-                - value_centered   
-        """
-        result_rows = []
-
-        grouped = df.groupby(['participant_id', 'bow_stroke', 'up_down'])
-
-        stroke_dict = {key: group for key, group in grouped}
-
-        for participant_id in df['participant_id'].unique():
-            full_stroke_index = 0
-
-            participant_strokes = sorted(df[df['participant_id'] == participant_id]['bow_stroke'].unique())
-
-            for bs in participant_strokes:
-                up_half = stroke_dict.get((participant_id, bs, 0))
-                down_half = stroke_dict.get((participant_id, bs + 1, 1))
-
-                if up_half is not None and down_half is not None and len(up_half) == 101 and len(down_half) == 101:
-                    combined = pd.concat([up_half, down_half], ignore_index=True)
-                    combined = combined.sort_values(["up_down", "dp_time_point"]).reset_index(drop=True)
-                    combined["dp_time_point"] = range(202)
-                    combined["full_stroke"] = full_stroke_index
-                    result_rows.append(combined[[
-                        "participant_id", 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left',
-                        "PRMD_ever", "target", "axis", 'bow_stroke', "full_stroke",
-                        'up_down', "dp_time_point", 'value', 'mean_value', "value_centered"
-                    ]])
-                    full_stroke_index += 1
-
-        return pd.concat(result_rows, ignore_index=True)
+    #@staticmethod
+    #def combine_half_strokes_to_full_cycles(df: pd.DataFrame) -> pd.DataFrame:
+    #    """
+    #    Efficiently combines up and down half-strokes into full strokes (202 points) per participant.
+    #    
+    #    Args:
+    #        df (pd.DataFrame): Input DataFrame with columns (among others):
+    #            - participant_id
+    #            - bow_stroke
+    #            - up_down
+    #            - dp_time_point
+    #            - value
+    #    Returns:
+    #        pd.DataFrame: DataFrame with combined full strokes:
+    #            - participant_id
+    #            - PRMD_shoulder_neck_right
+    #            - PRMD_shoulder_neck_left
+    #            - PRMD_ever
+    #            - target
+    #            - axis
+    #            - bow_stroke
+    #            - full_stroke (index of the full stroke per participant)
+    #            - up_down
+    #            - dp_time_point (0–201)
+    #            - value   
+    #            - mean_value   
+    #            - value_centered   
+    #    """
+    #    result_rows = []
+#
+    #    grouped = df.groupby(['participant_id', 'bow_stroke', 'up_down'])
+#
+    #    stroke_dict = {key: group for key, group in grouped}
+#
+    #    for participant_id in df['participant_id'].unique():
+    #        full_stroke_index = 0
+#
+    #        participant_strokes = sorted(df[df['participant_id'] == participant_id]['bow_stroke'].unique())
+#
+    #        for bs in participant_strokes:
+    #            up_half = stroke_dict.get((participant_id, bs, 0))
+    #            down_half = stroke_dict.get((participant_id, bs + 1, 1))
+#
+    #            if up_half is not None and down_half is not None and len(up_half) == 101 and len(down_half) == 101:
+    #                combined = pd.concat([up_half, down_half], ignore_index=True)
+    #                combined = combined.sort_values(["up_down", "dp_time_point"]).reset_index(drop=True)
+    #                combined["dp_time_point"] = range(202)
+    #                combined["full_stroke"] = full_stroke_index
+    #                result_rows.append(combined[[
+    #                    "participant_id", 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left',
+    #                    "PRMD_ever", "target", "axis", 'bow_stroke', "full_stroke",
+    #                    'up_down', "dp_time_point", 'value', 'mean_value', "value_centered"
+    #                ]])
+    #                full_stroke_index += 1
+#
+    #    return pd.concat(result_rows, ignore_index=True)
     
     @staticmethod
     def pivot_full_cycles_to_wide(df: pd.DataFrame, value) -> pd.DataFrame:

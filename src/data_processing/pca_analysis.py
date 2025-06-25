@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 
 from data_processing.data_preprocess import DataProcessor
 
+# TODO: check PCA requirements: correlations between features should be linear, data set should be free of outliers, variables should be continuous
+# TODO: check PCA rotation
+# TODO: create plots per group (PCA features per group)
 class PCAAnalyser:
     
     def __init__(self):
@@ -23,7 +26,7 @@ class PCAAnalyser:
         """
         Standardize the input DataFrame using z-score normalization.
 
-        Parameters:
+        Args:
             df (pd.DataFrame): DataFrame containing numeric features to standardize.
 
         Returns:
@@ -40,7 +43,7 @@ class PCAAnalyser:
         """
         Apply PCA to the input DataFrame and retain components explaining the desired variance.
 
-        Parameters:
+        Args:
             df (pd.DataFrame): Standardized input data.
             variance_level (float): Desired cumulative variance to retain (e.g., 0.95 for 95%).
 
@@ -53,8 +56,9 @@ class PCAAnalyser:
                 - df_pca_scores: Transformed data as DataFrame with named components.
         """
         pca_stand = PCA()
-        principal_components = pca_stand.fit(df)
+        pca_stand.fit(df)
 
+        explained_variance = pca_stand.explained_variance_ratio_
         cumulative_variance = np.cumsum(pca_stand.explained_variance_ratio_)
         k = np.argmax(cumulative_variance >= variance_level) + 1
         
@@ -62,17 +66,14 @@ class PCAAnalyser:
         pca_final = PCA(n_components=k)
         pca_scores= pca_final.fit_transform(df)
         df_pca_scores= pd.DataFrame(pca_scores, columns=[f"PC{int(col)}" for col in range(1,k+1)])  
-        return    cumulative_variance, k, pca_final, pca_scores, df_pca_scores
+        return    explained_variance[:k], cumulative_variance[:k], k, pca_final, pca_scores, df_pca_scores
     
     @staticmethod
     def calculate_t_test(df:pd.DataFrame) -> list:
         """
         Perform independent t-tests for each principal component between pain and no-pain groups.
 
-        Groups are formed using the 'PRMD_ever' column (1 = pain, 0 = no pain).
-        To avoid over-representation, mean scores per participant are used.
-
-        Parameters:
+        Args:
             df (pd.DataFrame): DataFrame containing PC scores, 'participant_id', and 'PRMD_ever'.
 
         Returns:
@@ -98,7 +99,7 @@ class PCAAnalyser:
         Rank principal components (PCs) based on their t-test effect size (absolute t-value)
         across all given (target, axis) combinations.
 
-        Parameters:
+        Args:
             unique_target_axes (list): List of (target, axis) tuples to evaluate.
             df (pd.DataFrame): DataFrame containing PC scores and metadata.
 
@@ -122,7 +123,7 @@ class PCAAnalyser:
         """
         Calculate mean waveforms (over time) for pain, no-pain, and overall across last 202 columns (e.g., PC scores).
 
-        Parameters:
+        Args:
             df (pd.DataFrame): DataFrame with time series data and 'PRMD_ever' column.
 
         Returns:
@@ -141,6 +142,7 @@ class PCAAnalyser:
         
         return mean_waveform_pain, mean_waveform_no_pain, mean_waveform
     
+    #TODO: see if i can adjust the half_strokes function, to avoid doubling
     @staticmethod
     def combine_half_strokes_to_full_cycles_mean_note(mean_note_waveforms):
         """
@@ -148,7 +150,7 @@ class PCAAnalyser:
 
         Assumes bow strokes are numbered consecutively: even = up, odd = down.
 
-        Parameters:
+        Args:
             mean_note_waveforms (pd.DataFrame): DataFrame containing averaged waveform data
                 with columns: ['target', 'axis', 'bow_stroke', 'up_down', 'time_point', 'mean_value'].
 
@@ -178,7 +180,20 @@ class PCAAnalyser:
     
 
     def reconstruct_data(self, scaler, pca_scores, pc_idx, mean_note_waveforms, loading_vector):
-        #scaler = StandardScaler()
+        """
+        Reconstructs the original time-series data from PCA scores and a loading vector.
+
+        Args:
+            scaler (StandardScaler): Scaler used to inverse-transform the PCA reconstruction.
+            pca_scores (pd.DataFrame): DataFrame containing PC1, PC2, and PC3 scores.
+            pc_idx (int): Index of the principal component to reconstruct.
+            mean_note_waveforms (pd.DataFrame): Mean waveform values per full stroke and time point.
+            loading_vector (np.ndarray): Loading vector for the selected principal component.
+
+        Returns:
+            pd.DataFrame: A DataFrame containing the reconstructed time-series and associated metadata.
+        """
+        
         pc_scores = np.array(pca_scores[['PC1', 'PC2', 'PC3']])[:, pc_idx]
         recon_centered = np.outer(pc_scores, loading_vector)
         recon_orig = scaler.inverse_transform(recon_centered)
@@ -186,14 +201,11 @@ class PCAAnalyser:
         mean_note_waveforms = self.combine_half_strokes_to_full_cycles_mean_note(mean_note_waveforms)
         mean_lookup = {(row['full_stroke'], row['time_point']): row['mean_value']
                    for _, row in mean_note_waveforms.iterrows()}
-        # TODO: check i can iterate over the samples effectively
-        
-        # iterate through the pc
+        # TODO: check how to iterate over the samples effectively
+
         for sample_idx in range(0,len(recon_orig)):
             stroke_idx = sample_idx % 11
             for time_point_idx in range(0,202):
-                #mean_value = mean_note_waveforms[(mean_note_waveforms['full_stroke'] == stroke_idx) & 
-                #                                                                 (mean_note_waveforms['time_point'] == time_point_idx)]['mean_value']
                 mean_value = mean_lookup.get((stroke_idx, time_point_idx), 0.0)
                 reconstructed[sample_idx][time_point_idx] += mean_value
         df_reconstructed = pd.DataFrame(reconstructed)
@@ -203,6 +215,15 @@ class PCAAnalyser:
     
     @staticmethod
     def extract_PCA_index(pca_name:str):
+        """
+        Extracts the zero-based index from a PCA component name string (e.g., 'PC1' → 0).
+
+        Args:
+            pca_name (str): The name of the PCA component (e.g., 'PC1', 'PC2').
+
+        Returns:
+            int | None: The extracted zero-based index, or None if no numeric component found.
+        """
         number = re.search(r"\d+", pca_name)
         if number:
             return int(number.group())-1
@@ -210,6 +231,18 @@ class PCAAnalyser:
     
     @staticmethod
     def calculate_lower_upper_band(pc_scores, mean_waveform, loading_vector):
+        """
+        Calculates the lower (5th percentile) and upper (95th percentile) bands of the 
+        reconstructed waveform based on PCA scores and loading vector.
+
+        Args:
+            pc_scores (np.ndarray): The PCA scores for a single component.
+            mean_waveform (np.ndarray): The mean waveform to which variation is added.
+            loading_vector (np.ndarray): Loading vector used to scale the variation.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Arrays representing the lower and upper waveform bands.
+        """
         lower_percentile =    np.percentile(pc_scores, 5)
         upper_percentile = np.percentile(pc_scores, 95)
         
@@ -220,6 +253,20 @@ class PCAAnalyser:
 
     @staticmethod
     def calculate_lower_upper_band_unscaled(pc_scores, mean_waveform, loading_vector, scaler):
+        """
+        Calculates the lower and upper reconstruction bands in the original data scale 
+        using inverse transformation of scaled loadings.
+
+        Args:
+            pc_scores (np.ndarray): The PCA scores for a single component.
+            mean_waveform (np.ndarray): The mean waveform to which variation is added.
+            loading_vector (np.ndarray): Loading vector used to scale the variation.
+            scaler (StandardScaler): Scaler used to inverse-transform the waveform.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Arrays representing the lower and upper waveform bands.
+        """
+        
         lower_percentile =    np.percentile(pc_scores, 5)
         upper_percentile = np.percentile(pc_scores, 95)
         
@@ -242,6 +289,23 @@ class PCAAnalyser:
 
 
     def reconstruct_single_component(self, ranked_pc, pcs_final, pca_scores, df, scaler, mean_note_waveform):
+        """
+        Reconstructs a waveform from a single principal component and calculates corresponding
+        waveform bands and summary statistics.
+
+        Args:
+            ranked_pc (pd.Series): Metadata describing the selected PCA component (e.g., PC, target, axis).
+            pcs_final (pd.DataFrame): DataFrame containing trained PCA models per target and axis.
+            pca_scores (pd.DataFrame): PCA score data used for reconstruction.
+            df (pd.DataFrame): Original input data used for mean waveform calculation.
+            scaler (StandardScaler): Scaler used for inverse-transforming PCA outputs.
+            mean_note_waveform (pd.DataFrame): DataFrame with mean waveforms used in reconstruction.
+
+        Returns:
+            dict: A dictionary containing the reconstructed waveform, loading vector, PCA scores,
+                and the lower and upper reconstruction bands.
+        """
+        
         target = ranked_pc['target']
         axis = ranked_pc['axis']
         pc_idx = self.extract_PCA_index(ranked_pc['PC'])
@@ -269,6 +333,22 @@ class PCAAnalyser:
         }
 
     def reconstruct_single_component_old(self, ranked_pc, pcs_final, pca_scores, df, scaler):
+        """
+        Reconstructs a waveform from a single principal component without using 
+        pre-combined mean waveforms.
+
+        Args:
+            ranked_pc (pd.Series): Metadata describing the selected PCA component (e.g., PC, target, axis).
+            pcs_final (pd.DataFrame): DataFrame containing trained PCA models per target and axis.
+            pca_scores (pd.DataFrame): PCA score data used for reconstruction.
+            df (pd.DataFrame): Original input data used for mean waveform calculation.
+            scaler (StandardScaler): Scaler used for inverse-transforming PCA outputs.
+
+        Returns:
+            dict: A dictionary containing the reconstructed waveform, loading vector, PCA scores,
+                and the lower and upper reconstruction bands (in original scale).
+        """
+        
         target = ranked_pc['target']
         axis = ranked_pc['axis']
         pc_idx = self.extract_PCA_index(ranked_pc['PC'])
@@ -295,6 +375,19 @@ class PCAAnalyser:
     
     @staticmethod
     def plot_PCA_reconstruction(component_data, title_waveform="Mean Waveform", title_loading="Loading Vector"):
+        """
+        Plots the reconstructed mean waveforms with percentile bands and the corresponding 
+        loading vector of a PCA component.
+
+        Args:
+            component_data (dict): Output dictionary from a reconstruction method containing waveform and PCA info.
+            title_waveform (str): Title for the mean waveform plot.
+            title_loading (str): Title for the loading vector plot.
+
+        Returns:
+            tuple[matplotlib.figure.Figure, list[matplotlib.axes._axes.Axes]]: The figure and axes objects for further customization or saving.
+        """
+        
         mean_waveform_pain = component_data['mean_waveform_pain']
         mean_waveform_no_pain = component_data['mean_waveform_no_pain']
         lower_band = component_data['lower_band']
@@ -340,6 +433,104 @@ class PCAAnalyser:
         full_filename = f"{filename}.{file_format}"
         fig.savefig(str(file_path) +'\\' + full_filename, dpi=dpi, format=file_format)
         print(f"Plot saved to {full_filename}")
+    
+    @staticmethod
+    def plot_linearity(df):
+        from pandas.plotting import scatter_matrix
+        from pandas.plotting import lag_plot
+        # Assume 'data' is a DataFrame of shape [n_movements, 202] (flattened over all participants/movements)
+        # For demonstration, select every 20th timepoint
+        subset = df.iloc[:, ::20]
+        fig1 = plt.figure(figsize=(12, 12))
+        scatter_matrix(subset, ax=fig1.add_subplot(111))
+        plt.suptitle('Scatter Matrix of Selected Timepoints')
+        plt.tight_layout()
+        #plt.show()
+
+        # Lag Plot
+        #flattened = pd.Series(np.ravel(df))
+
+        #fig2 = plt.figure(figsize=(6, 6))
+        #lag_plot(flattened, lag=1)
+        #plt.title('Lag Plot (lag=1) for All Samples Combined')
+        #plt.xlabel('Value at time t') 
+        #plt.ylabel('Value at time t+1')
+        #plt.tight_layout()
+        #plt.show()
+        
+        fig2 = plt.figure(figsize=(6, 6))
+        unique_participants = df['participant_id'].unique()
+        for i, participant in enumerate(unique_participants):  # plot first 5 samples
+            df_part = df[df['participant_id'] == participant].iloc[:, -202:]
+            flattened = pd.Series(np.ravel(df_part))
+            lag_plot(flattened, lag=1, alpha=0.4, c=plt.cm.tab20(i), label=f'Sample {i+1}')
+            #lag_plot(df.iloc[i, :], lag=1, alpha=0.4, c=plt.cm.tab20(i), label=f'Sample {i+1}')
+        plt.title('Lag Plots for all participants Samples')
+        plt.xlabel('Value at time t') 
+        plt.ylabel('Value at time t+1')
+        plt.legend()
+        plt.show()
+        
+        #return fig1, fig2, fig3
+    
+    @staticmethod    
+    def sliding_window_outlier_detection(df, window=10, threshold=3):
+        # Sliding window (window size = 10) for datapoints t1 - t200
+        #data
+        df_outliers_adj = df.copy()
+        count_outliers = 0
+        
+        unique_participants = df['participant_id'].unique()
+        for participant in unique_participants:
+            df_part = df[df['participant_id']==participant]
+            part_row_idx = 0
+            for idx, row in df_part.iloc[:, -202:].iterrows():
+                series = row.values
+                for i in range(len(series)):
+                    # Skip first and last datapoints
+                    if i == 0 or i == len(series) - 1:
+                        continue
+                    start = max(0, i - window // 2)
+                    end = min(len(series), i + window // 2 + 1)
+                    window_vals = np.delete(series[start:end], np.where(np.arange(start, end) == i - start))
+                    mean = np.mean(window_vals)
+                    std = np.std(window_vals)
+                    if std > 0 and abs(series[i] - mean) > threshold * std:
+                        df_outliers_adj.at[idx, df.columns[i+5]] = df[df.columns[i+5]].mean()
+                        count_outliers += 1
+                # Calculate group mean for t0 and t201, as sliding window is unstable at the edges
+                # compare value to group mean to decide if it's an outlier
+                first_col_mean = df_part.drop(index=idx).iloc[:, 5].mean()
+                first_col_std = df_part.drop(index=idx).iloc[:, 5].std()
+                if abs(df_part.iloc[part_row_idx, 5] - first_col_mean) >= threshold * first_col_std:
+                    df_outliers_adj.iloc[idx, 5] = df_part.iloc[:, 5].mean()
+                    count_outliers += 1
+                # For last timepoint (tN)
+                last_col_mean = df_part.drop(index=idx).iloc[:, -1].mean()
+                last_col_std = df_part.drop(index=idx).iloc[:, -1].std()
+                if abs(df_part.iloc[part_row_idx, 5] - last_col_mean) >= threshold * last_col_std:
+                    df_outliers_adj.iloc[idx, -1] = df_part.iloc[:, -1].mean()
+                    count_outliers += 1
+                part_row_idx += 1
+
+                
+        return df_outliers_adj, count_outliers
+    #def sliding_window_outlier_detection(df, window=10, threshold=3):
+    #    # Create a copy to avoid modifying the original DataFrame
+    #    outlier_mask = pd.DataFrame(True, index=df.index, columns=df.columns)
+    #    
+    #    for idx, row in df.iterrows():
+    #        series = row.values
+    #        for i in range(len(series)):
+    #            # Define window, excluding the current point
+    #            start = max(0, i - window // 2)
+    #            end = min(len(series), i + window // 2 + 1)
+    #            window_vals = np.delete(series[start:end], np.where(np.arange(start, end) == i - start))
+    #            mean = np.mean(window_vals)
+    #            std = np.std(window_vals)
+    #            if std > 0 and abs(series[i] - mean) > threshold * std:
+    #                outlier_mask.at[idx, df.columns[i]] = False
+    #    return outlier_mask
         
     
     

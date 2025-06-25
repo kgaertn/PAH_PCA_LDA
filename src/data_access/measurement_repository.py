@@ -34,6 +34,13 @@ class MeasurementRepository:
 
 # region Getter
 # use these functions to access data from the measurement table, depending on the needs
+    def get_existing_measurement_ids(self):
+        cursor = self.conn.cursor()
+        cursor.execute("""
+            SELECT DISTINCT id FROM measurement
+        """)
+        return [row[0] for row in cursor.fetchall()]
+        
     def get_measurements_by_participant_id(self, participant_id: str) -> pd.DataFrame:
         """
         Retrieves all measurement data for a participant using their participant ID
