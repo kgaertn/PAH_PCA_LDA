@@ -46,4 +46,21 @@ class PCScoresRepository:
             return None
         columns = [desc[0] for desc in cursor.description]
         return pd.DataFrame(rows, columns=columns)
+    
+    def get_pc_scores_by_rank(self, exp_id, device, min_rank, max_rank):
+        """
+        Returns a Dataframe from the Participants PCs table.
+        """
+        cursor = self.conn.cursor()
+        query = """
+            SELECT * FROM [Participants PCs]
+            WHERE exp_id = ? AND device = ? AND rank BETWEEN ? AND ?
+            ORDER BY rank
+        """
+        cursor.execute(query, (exp_id, device, min_rank, max_rank))
+        rows = cursor.fetchall()
+        if not rows:
+            return None
+        columns = [desc[0] for desc in cursor.description]
+        return pd.DataFrame(rows, columns=columns)
 # endregion Getter

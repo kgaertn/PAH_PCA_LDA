@@ -32,14 +32,17 @@ class ScalerRepository:
 # use these functions to access data from the experiment table, depending on the needs
 # TODO
 
-    def get_existing_samples(self):
+    def get_sacler_by_meas_type_id(self, meas_type_id):
         """
         Returns a set of (measurement_id, bow_stroke_start) tuples from the sample table.
         """
         cursor = self.conn.cursor()
         cursor.execute("""
-            SELECT DISTINCT measurement_id, bow_stroke_start FROM sample
-        """)
-        results = cursor.fetchall()
-        return set(results) 
+                       SELECT * FROM scaler WHERE measurement_type_id = ?;""",
+                       (meas_type_id,))
+        row = cursor.fetchone()
+        if row:
+            return Scaler(id=row[0], measurement_type_id=row[1], scaler_type=row[2], 
+                              mean = Scaler.list_from_json(row[3]), scale = Scaler.list_from_json(row[4]))
+        return None
 # endregion Getter

@@ -79,13 +79,48 @@ def main():
                 pca_analyser.upload_pc_scores(pc_id, sample_scores)
             #print("")
             print(f"{target} {axis} analysed and saved")
-    # TODO: rank PCs and save results to DB
     # select the PCs and PCscores, as well as participant information (pain/no pain)
-    pca_df = pca_analyser.load_pc_data(1, device)
-    t_test_results = pca_analyser.rank_pcs(pca_df)
-    #df for t_test braucht: target, axis, participant id, pc_scores, PRMD_ever
-    print("")
+    t_test_results_uploaded = True
+    if not t_test_results_uploaded:
+        pca_df = pca_analyser.load_pc_data(1, device)
+        t_test_results = pca_analyser.rank_pcs(pca_df)
+        pca_analyser.upload_t_test_results(t_test_results)
+
     # TODO: reconstruct & plot top PCs
+    # TODO: plot upper/lower bands per group
+    highest_rank = 1
+    lowest_rank = 10
+    ranked_pc_scores_df = pca_analyser.load_pcs_by_rank(1, device, highest_rank, lowest_rank)
+    for rank in range(highest_rank, lowest_rank+1):
+        current_pc_df = ranked_pc_scores_df[ranked_pc_scores_df['rank'] == rank]
+        target, axis = current_pc_df['target'].unique()[0], current_pc_df['axis'].unique()[0]
+        measurement_type_id = int(current_pc_df['meas_type_id'].unique()[0])
+        participants = current_pc_df['participant_id'].unique()
+        participants = tuple(int(x) for x in participants)
+        df = data_processor.load_MPA_clean_data_by_device_tp_target_axis_participants(device, measurement_tp, target, participants, axis)
+        df_reduced = df[[
+                'participant_id', 'ext_participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever',
+                'measurement_id', 'target', 'axis', 'sample_id', 'bow_stroke', 'up_down', 'key', 'dp_time_point',
+                'value'
+            ]]
+        df_transformed = data_processor.pivot_full_cycles_to_wide(df_reduced, 'value')
+        scaler_info = pca_analyser.load_specific_scaler(measurement_type_id)
+        scaler = StandardScaler()
+        scaler.mean_ = scaler_info.mean
+        scaler.scale_ = scaler_info.scale
+        component_reconstruction_data = pca_analyser.reconstruct_single_component(current_pc_df, df_transformed, scaler) 
+        #plot PCA reconstruction
+        pc_name = "PC"+str(current_pc_df['pc_index'].unique()[0])
+        title_reconstruction = f'Single component reconstruction: Rank {rank}, {target} {axis}; {pc_name}'
+        title_loading_vector = f'Loading vector: Rank {rank} {target} {axis}; {pc_name}'
+        fig, axs = pca_analyser.plot_PCA_reconstruction(component_reconstruction_data, title_reconstruction, title_loading_vector)
+          
+        current_path = Path.cwd()
+        output_path = current_path / "output" / "plots"
+        pca_analyser.save_plot(fig, output_path, f"Scaled_Orig_Rank_{rank}_{target}_{axis}_{pc_name}")
+           
+        print("")
+    
     # TODO: LDA
     
 

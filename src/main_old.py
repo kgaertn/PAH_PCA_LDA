@@ -13,8 +13,8 @@ def main():
     # TODO: save results to DB
     data_processor = DataProcessor()
     pca_analyser = PCAAnalyser()
-    df = data_processor.load_data_one_joint('right elbow joint angle')
-    #df = data_processor.load_full_device_data('mocap')
+    #df = data_processor.load_data_one_joint('right elbow joint angle')
+    df = data_processor.load_full_device_data('mocap')
     unique_target_axes = df[["target", "axis"]].drop_duplicates().values.tolist()
 
     df_combined_strokes, df_mean_key_total = pd.DataFrame(), pd.DataFrame()
@@ -38,7 +38,7 @@ def main():
         df_strokes_target_axis = data_processor.combine_half_strokes_to_full_cycles_old(df_key_normalized)
         df_combined_strokes = pd.concat([df_combined_strokes, df_strokes_target_axis])
         
-        df_transformed = data_processor.pivot_full_cycles_to_wide(df_strokes_target_axis, 'value_centered' )
+        df_transformed = data_processor.pivot_full_cycles_to_wide_old(df_strokes_target_axis, 'value_centered' )
         #df_part, df_pca = df_transformed.iloc[:, :5], df_transformed.iloc[:, -202:]
 
         # check df for outliers:
@@ -71,7 +71,7 @@ def main():
     pcs_final = pd.DataFrame(pcs_final, columns = ['target', 'axis', 'PCA'])        
     scaler_df = pd.DataFrame(scaler_list, columns = ['target', 'axis', 'scaler']) 
     
-    pcs_ranked = pca_analyser.rank_pcs(df_combined)
+    pcs_ranked = pca_analyser.rank_pcs_old(unique_target_axes, df_combined)
     #pcs_ranked_orig = pca_analyser.rank_pcs(unique_target_axes, df_combined_orig)
     
     max_pcs = 10

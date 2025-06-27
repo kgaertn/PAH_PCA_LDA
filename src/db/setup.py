@@ -263,7 +263,7 @@ def create_PCA_View():
 		CREATE VIEW IF NOT EXISTS "Participants PCs" AS
 			SELECT
                e.id AS exp_id, p.id AS participant_id, p.participant_id AS ext_participant_id, p.PRMD_shoulder_neck_left, 
-			   p.PRMD_shoulder_neck_right, p.PRMD_ever, m.device, m.timepoint AS meas_time_point, m.target, m.axis, 
+			   p.PRMD_shoulder_neck_right, p.PRMD_ever, m.device, mt.id AS meas_type_id, m.timepoint AS meas_time_point, m.target, m.axis, 
 			   pcr.id AS pc_id, pcr.pc_index, pcr.rank, pcr.loading_vector, pcr.explained_variance, 
 			   pcr.group_mean_pain, pcr.group_mean_no_pain, pcr.t_value, pcr.p_value, pcr.data_scaled, 
 			   s.id, pcs.pc_score

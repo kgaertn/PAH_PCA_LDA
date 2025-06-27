@@ -48,6 +48,20 @@ class DataProcessor:
         """
         df = self.dp_repo.get_datapoints_by_exp_id_device_timepoint_target_axis(1, device, timepoint, target, axis)
         return df        
+    def load_MPA_clean_data_by_device_tp_target_axis_participants(self, device:str, timepoint:str, target:str,  part_ids:tuple, axis:str = None):
+        """
+        Load and filter datapoints for a specific joint from the 'mocap' device
+        at the 'pre' timepoint of experiment ID 1.
+
+        Args:
+            joint (str): The name of the joint to retrieve data for.
+
+        Returns:
+            pd.DataFrame: A filtered DataFrame containing selected columns relevant 
+            to the specified joint.
+        """
+        df = self.dp_repo.get_datapoints_by_exp_id_device_timepoint_target_axis_part_ids(1, device, timepoint, target, part_ids, axis)
+        return df   
     
     def load_data_one_joint(self, joint:str) -> pd.DataFrame:
         """
@@ -132,22 +146,28 @@ class DataProcessor:
 
         stroke_dict = {key: group for key, group in grouped}
 
-        full_stroke_index = 0
+        for participant_id in df['participant_id'].unique():
+            full_stroke_index = 0
 
-        bow_strokes = sorted(df['bow_stroke'].unique())
-        for bs in bow_strokes:
-            up_half = stroke_dict.get((bs, 0))
-            down_half = stroke_dict.get((bs + 1, 1))
+            participant_strokes = sorted(df[df['participant_id'] == participant_id]['bow_stroke'].unique())
 
-            if up_half is not None and down_half is not None and len(up_half) == 101 and len(down_half) == 101:
-                combined = pd.concat([up_half, down_half], ignore_index=True)
-                combined = combined.sort_values(["up_down", "time_point"]).reset_index(drop=True)
-                combined["updated_time_point"] = range(202)
-                combined["full_stroke"] = full_stroke_index
-                result_rows.append(combined)
-                full_stroke_index += 1
+            for bs in participant_strokes:
+                up_half = stroke_dict.get((participant_id, bs, 0))
+                down_half = stroke_dict.get((participant_id, bs + 1, 1))
 
-        return pd.concat(result_rows, ignore_index=True)            
+                if up_half is not None and down_half is not None and len(up_half) == 101 and len(down_half) == 101:
+                    combined = pd.concat([up_half, down_half], ignore_index=True)
+                    combined = combined.sort_values(["up_down", "dp_time_point"]).reset_index(drop=True)
+                    combined["dp_time_point"] = range(202)
+                    combined["full_stroke"] = full_stroke_index
+                    result_rows.append(combined[[
+                        "participant_id", 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left',
+                        "PRMD_ever", "target", "axis", 'bow_stroke', "full_stroke",
+                        'up_down', "dp_time_point", 'value', 'mean_value', "value_centered"
+                    ]])
+                    full_stroke_index += 1
+
+        return pd.concat(result_rows, ignore_index=True)      
     
     @staticmethod
     def combine_half_strokes_to_full_cycles(df: pd.DataFrame) -> pd.DataFrame:
@@ -325,6 +345,32 @@ class DataProcessor:
         ).reset_index()
 
         wide_df.columns = ['participant_id', "measurement_id", 'PRMD_ever', 'target', 'axis', 'sample_id'] + [f"t{int(col)}" for col in wide_df.columns[-202:]]
+
+        return wide_df
+
+    @staticmethod
+    def pivot_full_cycles_to_wide_old(df: pd.DataFrame, value) -> pd.DataFrame:
+        """
+        Transforms a DataFrame with full gait cycles (202 dp_time_point entries per cycle)
+        into wide format where each dp_time_point becomes a separate column.
+
+        Args:
+            df (pd.DataFrame): DataFrame with columns:
+                - participant_id
+                - full_stroke
+                - dp_time_point
+                - value
+
+        Returns:
+            pd.DataFrame: Wide-format DataFrame with one row per full stroke and 202 value columns.
+        """
+        wide_df = df.pivot_table(
+            index=["participant_id", "PRMD_ever", 'target', 'axis', "full_stroke"],
+            columns="dp_time_point",
+            values= value
+        ).reset_index()
+
+        wide_df.columns = ['participant_id', 'PRMD_ever', 'target', 'axis', 'full_stroke'] + [f"t{int(col)}" for col in wide_df.columns[-202:]]
 
         return wide_df
     

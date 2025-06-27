@@ -75,6 +75,58 @@ class PCAAnalyser:
         pca_scores= pca_final.fit_transform(df)
         df_pca_scores= pd.DataFrame(pca_scores, columns=[f"PC{int(col)}" for col in range(1,k+1)])  
         return    explained_variance[:k], cumulative_variance[:k], k, pca_final, pca_scores, df_pca_scores
+
+    @staticmethod
+    def calculate_t_test_old(df:pd.DataFrame) -> list:
+        """
+        Perform independent t-tests for each principal component between pain and no-pain groups.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing PC scores, 'participant_id', and 'PRMD_ever'.
+
+        Returns:
+            list: A list of lists, each containing:
+                [target, axis, PC name, t-statistic, p-value]
+        """
+        pc_cols = df.iloc[:, 5:]
+        target = df['target'][0]
+        axis = df['axis'][0]
+        t_test_result = []
+
+        for pc in pc_cols:
+            if not df[pc].isna().all():
+                df_pc_mean_stand = df.groupby(['participant_id', 'PRMD_ever'])[pc].mean().reset_index()
+                df_mean_pain = df_pc_mean_stand[df_pc_mean_stand['PRMD_ever'] == 1][pc]
+                df_mean_nopain = df_pc_mean_stand[df_pc_mean_stand['PRMD_ever'] == 0][pc]
+                
+                t_stat, p_value = ttest_ind(df_mean_pain, df_mean_nopain, equal_var=False)
+                t_test_result.append([target, axis, pc, t_stat, p_value])
+        return t_test_result
+       
+    def rank_pcs_old(self, unique_target_axes:list, df:pd.DataFrame):
+        """
+        Rank principal components (PCs) based on their t-test effect size (absolute t-value)
+        across all given (target, axis) combinations.
+
+        Args:
+            unique_target_axes (list): List of (target, axis) tuples to evaluate.
+            df (pd.DataFrame): DataFrame containing PC scores and metadata.
+
+        Returns:
+            pd.DataFrame: DataFrame of t-test results sorted by absolute t-value, 
+                        with columns: ['target', 'axis', 'PC', 't_value', 'p_value'].
+        """
+        #TODO: calculate and return the group mean and SD (pain/no pain) for each PC
+        t_test_total = []
+        for target, axis in unique_target_axes:
+            df_target_axis = df[(df["target"] == target) & (df["axis"] == axis)]
+            t_test_target_axis = self.calculate_t_test_old(df_target_axis)
+            t_test_total.extend(t_test_target_axis)
+        
+        df_t_test = pd.DataFrame(t_test_total, columns = ['target', 'axis', 'PC', 't_value', 'p_value'])
+        df_t_test_ranked = df_t_test.sort_values(by="t_value", key=lambda x: x.abs(), ascending=False).reset_index(drop=True)
+        return df_t_test_ranked
+
     
     @staticmethod
     def calculate_t_test(df:pd.DataFrame) -> list:
@@ -93,10 +145,13 @@ class PCAAnalyser:
         target = df['target'].iloc[0]
         axis = df['axis'].iloc[0]
         t_test_result = []
+        # temp
+        if (target, axis) == ('right ht joint angle','Y'):
+            print("")
         for pc_id in pc_ids:
             #if not df[pc].isna().all():
             pc_idx = df[df['pc_id'] == pc_id]['pc_index'].iloc[0]
-            df_pc_mean = df.groupby(['participant_id', 'PRMD_ever'])['pc_score'].mean().reset_index()
+            df_pc_mean = df[df['pc_id'] == pc_id].groupby(['participant_id', 'PRMD_ever'])['pc_score'].mean().reset_index()
             df_pain = df_pc_mean[df_pc_mean['PRMD_ever'] == 1]['pc_score']
             df_nopain = df_pc_mean[df_pc_mean['PRMD_ever'] == 0]['pc_score']
             mean_pain = df_pain.mean()
@@ -265,9 +320,35 @@ class PCAAnalyser:
         upper_band = mean_waveform + upper_percentile * loading_vector
         
         return lower_band, upper_band
-
     @staticmethod
     def calculate_lower_upper_band_unscaled(pc_scores, mean_waveform, loading_vector, scaler):
+        """
+        Calculates the lower and upper reconstruction bands in the original data scale 
+        using inverse transformation of scaled loadings.
+
+        Args:
+            pc_scores (np.ndarray): The PCA scores for a single component.
+            mean_waveform (np.ndarray): The mean waveform to which variation is added.
+            loading_vector (np.ndarray): Loading vector used to scale the variation.
+            scaler (StandardScaler): Scaler used to inverse-transform the waveform.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]: Arrays representing the lower and upper waveform bands.
+        """
+        
+        lower_percentile =    np.percentile(pc_scores, 5)
+        upper_percentile = np.percentile(pc_scores, 95)
+                
+        loading_vector_orig = loading_vector * scaler.scale_
+        
+
+        lower_band = mean_waveform + loading_vector_orig * lower_percentile
+        upper_band = mean_waveform + loading_vector_orig * upper_percentile
+        
+        
+        return lower_band, upper_band
+    @staticmethod
+    def calculate_lower_upper_band_unscaled_old(pc_scores, mean_waveform, loading_vector, scaler):
         """
         Calculates the lower and upper reconstruction bands in the original data scale 
         using inverse transformation of scaled loadings.
@@ -301,9 +382,7 @@ class PCAAnalyser:
         
         return lower_band, upper_band
         
-
-
-    def reconstruct_single_component(self, ranked_pc, pcs_final, pca_scores, df, scaler, mean_note_waveform):
+    def reconstruct_single_component(self, pc_df, orig_df, scaler):
         """
         Reconstructs a waveform from a single principal component and calculates corresponding
         waveform bands and summary statistics.
@@ -321,21 +400,22 @@ class PCAAnalyser:
                 and the lower and upper reconstruction bands.
         """
         
-        target = ranked_pc['target']
-        axis = ranked_pc['axis']
-        pc_idx = self.extract_PCA_index(ranked_pc['PC'])
+        target = pc_df['target'].unique()[0]
+        axis = pc_df['axis'].unique()[0]
+        pc_idx = pc_df['pc_index'].unique()[0]
         
-        pca_target_axis = pcs_final[(pcs_final['target'] == target) & (pcs_final['axis'] == axis)]['PCA']
-        loading_vector = pca_target_axis.iloc[0].components_[pc_idx]
-        pc_scores = np.array(pca_scores[['PC1', 'PC2', 'PC3']])[:, pc_idx]
+        loading_vector = np.array(PC_Ranked.list_from_json(pc_df['loading_vector'].unique()[0]))
+        pc_scores = np.array(pc_df['pc_score'])
+        #pc_idx = self.extract_PCA_index(ranked_pc['PC'])
         
-        # reconstruct data 
-        df_reconstructed = self.reconstruct_data(scaler, pca_scores, pc_idx, mean_note_waveform, loading_vector)
+        #pca_target_axis = pcs_final[(pcs_final['target'] == target) & (pcs_final['axis'] == axis)]['PCA']
+        #loading_vector = pca_target_axis.iloc[0].components_[pc_idx]
+        #pc_scores = np.array(pca_scores[['PC1', 'PC2', 'PC3']])[:, pc_idx]
         
         # update the mean calculation
-        mean_waveform_pain, mean_waveform_no_pain, mean_waveform_total = self.calculate_mean_waveform_target_axis(df_reconstructed)       
+        mean_waveform_pain, mean_waveform_no_pain, mean_waveform_total = self.calculate_mean_waveform_target_axis(orig_df)       
         
-        lower_band, upper_band = self.calculate_lower_upper_band(pc_scores, mean_waveform_pain, loading_vector)
+        lower_band, upper_band = self.calculate_lower_upper_band_unscaled(pc_scores, mean_waveform_total, loading_vector, scaler)
         
         return {
         "mean_waveform_pain": mean_waveform_pain,
@@ -346,6 +426,50 @@ class PCAAnalyser:
         "lower_band": lower_band,
         "upper_band": upper_band
         }
+
+    #def reconstruct_single_component(self, ranked_pc, pcs_final, pca_scores, df, scaler, mean_note_waveform):
+    #    """
+    #    Reconstructs a waveform from a single principal component and calculates corresponding
+    #    waveform bands and summary statistics.
+#
+    #    Args:
+    #        ranked_pc (pd.Series): Metadata describing the selected PCA component (e.g., PC, target, axis).
+    #        pcs_final (pd.DataFrame): DataFrame containing trained PCA models per target and axis.
+    #        pca_scores (pd.DataFrame): PCA score data used for reconstruction.
+    #        df (pd.DataFrame): Original input data used for mean waveform calculation.
+    #        scaler (StandardScaler): Scaler used for inverse-transforming PCA outputs.
+    #        mean_note_waveform (pd.DataFrame): DataFrame with mean waveforms used in reconstruction.
+#
+    #    Returns:
+    #        dict: A dictionary containing the reconstructed waveform, loading vector, PCA scores,
+    #            and the lower and upper reconstruction bands.
+    #    """
+    #    
+    #    target = ranked_pc['target']
+    #    axis = ranked_pc['axis']
+    #    pc_idx = self.extract_PCA_index(ranked_pc['PC'])
+    #    
+    #    pca_target_axis = pcs_final[(pcs_final['target'] == target) & (pcs_final['axis'] == axis)]['PCA']
+    #    loading_vector = pca_target_axis.iloc[0].components_[pc_idx]
+    #    pc_scores = np.array(pca_scores[['PC1', 'PC2', 'PC3']])[:, pc_idx]
+    #    
+    #    # reconstruct data 
+    #    df_reconstructed = self.reconstruct_data(scaler, pca_scores, pc_idx, mean_note_waveform, loading_vector)
+    #    
+    #    # update the mean calculation
+    #    mean_waveform_pain, mean_waveform_no_pain, mean_waveform_total = self.calculate_mean_waveform_target_axis(df_reconstructed)       
+    #    
+    #    lower_band, upper_band = self.calculate_lower_upper_band(pc_scores, mean_waveform_pain, loading_vector)
+    #    
+    #    return {
+    #    "mean_waveform_pain": mean_waveform_pain,
+    #    "mean_waveform_no_pain": mean_waveform_no_pain,
+    #    "mean_waveform_total": mean_waveform_total,
+    #    "loading_vector": loading_vector,
+    #    "pc_scores": pc_scores,
+    #    "lower_band": lower_band,
+    #    "upper_band": upper_band
+    #    }
 
     def reconstruct_single_component_old(self, ranked_pc, pcs_final, pca_scores, df, scaler):
         """
@@ -572,6 +696,28 @@ class PCAAnalyser:
     def load_pc_data(self, exp_id, device):
         df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device)
         return df
+    
+    def load_pcs_by_rank(self, exp_id, device, min_rank, max_rank):
+        df = self.pc_scores_repo.get_pc_scores_by_rank(exp_id, device, min_rank, max_rank)
+        return df
+    
+    def upload_t_test_results(self, df):
+        t_test_results = []
+        for idx, row in df.iterrows():
+            t_test_results.append(PC_Ranked(
+                id = row['pc_id'],
+                measurement_type_id= 1,
+                rank = idx + 1,
+                group_mean_pain=row['mean_pain'],
+                group_mean_no_pain=row['mean_no_pain'],
+                t_value=row['t_value'],
+                p_value=row['p_value']                
+            ))
+        self.pc_ranked_repo.update_multiple_t_test_info(t_test_results)
+   
+    def load_specific_scaler(self, meas_type_id):
+        return self.scaler_repo.get_sacler_by_meas_type_id(meas_type_id)         
+        
     #def sliding_window_outlier_detection(df, window=10, threshold=3):
     #    # Create a copy to avoid modifying the original DataFrame
     #    outlier_mask = pd.DataFrame(True, index=df.index, columns=df.columns)
