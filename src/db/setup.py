@@ -1,5 +1,14 @@
 from db.connection import get_connection
 
+def adjusted_db_setup():
+    create_tables()
+    add_columns_if_missing('datapoint', new_columns = {'sample_id': 'INTEGER'})
+    create_adjusted_view()
+    create_datapoints_MPA_view()
+    create_datapoints_MPA_device_view('MoCap', 'mocap')
+    create_datapoints_MPA_device_view('EMG', 'emg')
+        
+
 def create_tables():
     conn = get_connection()
     cursor = conn.cursor()
@@ -32,6 +41,20 @@ def create_tables():
         )
     """)
     
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS measurement_type (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,  
+			experiment_id INTEGER,
+            device TEXT,
+			meas_time_point TEXT,
+			target TEXT,
+            axis TEXT,          
+			FOREIGN KEY (experiment_id) REFERENCES experiment(id)
+            UNIQUE (experiment_id, device, meas_time_point, target, axis)
+        );
+    """)
+
+    
     # Add measurement table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS measurement (
@@ -42,6 +65,7 @@ def create_tables():
             target TEXT,
             axis TEXT,
             unit TEXT,
+            measurement_type_id INTEGER,
             FOREIGN KEY (participant_id) REFERENCES participant(id)
         )
     """)
@@ -73,6 +97,52 @@ def create_tables():
             FOREIGN KEY (sample_id) REFERENCES sample(id)
         )
     """)
+    
+    # Add ranked pcs table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pcs_ranked (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            measurement_type_id INTEGER,
+            pc_index INTEGER,
+            loading_vector TEXT,
+            rank INTEGER,
+            explained_variance REAL,
+            group_mean_pain REAL, 
+            group_mean_no_pain REAL,
+            t_value REAL,
+            p_value REAL,
+            data_scaled INTEGER,
+            pca_info TEXT,
+            FOREIGN KEY (measurement_type_id) REFERENCES measurement_type(id)
+            UNIQUE (measurement_type_id, pc_index)
+        )
+    """)
+    
+    # Add pc_scores table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pc_scores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sample_id INTEGER,
+            pc_id INTEGER,
+            pc_score REAL,
+            FOREIGN KEY (sample_id) REFERENCES sample(id),
+            FOREIGN KEY (pc_id) REFERENCES pcs_ranked(id)
+        )
+    """)
+    
+    # Add scaler table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS scaler (
+            scaler_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            measurement_type_id INTEGER,
+            scaler_type VARCHAR(64),
+            mean TEXT,
+            scale TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (measurement_type_id) REFERENCES measurement_type(id)
+        );
+    """)
+    
     
     # Add index on measurement_id in datapoint
     cursor.execute("""
@@ -132,8 +202,10 @@ def create_adjusted_view():
                 CASE
                     WHEN up_down = 1 THEN time_point + 101
                     ELSE time_point
-                END AS time_point
-            FROM datapoint;
+                END AS time_point, 
+                value
+            FROM datapoint
+            WHERE sample_id IS NOT NULL;
     """)
     
  
@@ -148,10 +220,10 @@ def create_datapoints_MPA_view():
                 p.id AS participant_id, p.participant_id AS ext_participant_id, p.instrument, p.PRMD_shoulder_neck_right, 
                 p.PRMD_shoulder_neck_left, p.PRMD_upper_arm_right, 
                 p.PRMD_upper_arm_left, p.PRMD_ever,
-                m.id AS measurement_id, m.timepoint, m.device,
+                m.id AS measurement_id, m.measurement_type_id, m.timepoint, m.device,
                 m.target, m.axis, m.unit,
                 d.id AS dp_id, d.sample_id, d.bow_stroke, d.up_down,
-                d.key, d.time_point AS dp_time_point
+                d.key, d.time_point AS dp_time_point, d.value
 
             FROM experiment e
             JOIN participant p ON p.experiment_id = e.id
@@ -170,10 +242,10 @@ def create_datapoints_MPA_device_view(device_table_name:str, device:str):
                 p.id AS participant_id, p.participant_id AS ext_participant_id, p.instrument, p.PRMD_shoulder_neck_right, 
                 p.PRMD_shoulder_neck_left, p.PRMD_upper_arm_right, 
                 p.PRMD_upper_arm_left, p.PRMD_ever,
-                m.id AS measurement_id, m.timepoint, m.device,
+                m.id AS measurement_id, m.measurement_type_id, m.timepoint, m.device,
                 m.target, m.axis, m.unit,
                 d.id AS dp_id, d.sample_id, d.bow_stroke, d.up_down,
-                d.key, d.time_point AS dp_time_point
+                d.key, d.time_point AS dp_time_point, d.value
 
             FROM experiment e
             JOIN participant p ON p.experiment_id = e.id
@@ -181,6 +253,65 @@ def create_datapoints_MPA_device_view(device_table_name:str, device:str):
             JOIN datapoint_adjusted d ON d.measurement_id = m.id
             WHERE m.device = "{device}";
     """)
+    
+    
+def create_PCA_View():
+    
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+		CREATE VIEW IF NOT EXISTS "Participants PCs" AS
+			SELECT
+               e.id AS exp_id, p.id AS participant_id, p.participant_id AS ext_participant_id, p.PRMD_shoulder_neck_left, 
+			   p.PRMD_shoulder_neck_right, p.PRMD_ever, m.device, m.timepoint AS meas_time_point, m.target, m.axis, 
+			   pcr.id AS pc_id, pcr.pc_index, pcr.rank, pcr.loading_vector, pcr.explained_variance, 
+			   pcr.group_mean_pain, pcr.group_mean_no_pain, pcr.t_value, pcr.p_value, pcr.data_scaled, 
+			   s.id, pcs.pc_score
+
+            FROM experiment e
+			JOIN participant p ON p.experiment_id = e.id
+            JOIN measurement m ON m.participant_id = p.id
+			JOIN measurement_type mt ON m.measurement_type_id = mt.id
+            JOIN pcs_ranked pcr ON mt.id = pcr.measurement_type_id
+			JOIN sample s ON m.id = s.measurement_id
+            JOIN pc_scores pcs ON s.id = pcs.sample_id AND pcr.id = pcs.pc_id;
+    """)
+
+def fill_measurement_type_table():
+    #TODO
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"""
+        INSERT OR IGNORE INTO measurement_type (experiment_id, device, meas_time_point, target, axis)
+        SELECT DISTINCT
+        p.experiment_id,
+        m.device,
+        m.timepoint,
+        m.target,
+        m.axis
+        FROM measurement m
+        JOIN participant p ON m.participant_id = p.id;
+    """)
+    
+def add_measurement_type_id_to_measurement():
+    #TODO
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"""
+        UPDATE measurement
+            SET measurement_type_id = (
+            SELECT mt.id
+            FROM measurement_type mt
+            JOIN participant p ON measurement.participant_id = p.id
+            WHERE measurement.timepoint = mt.meas_time_point
+                AND measurement.target = mt.target
+                AND measurement.axis IS mt.axis
+                AND measurement.device = mt.device
+                AND p.experiment_id = mt.experiment_id
+            )
+            WHERE measurement_type_id IS NULL;
+    """)
+        
 
 if __name__ == "__main__":
     create_tables()

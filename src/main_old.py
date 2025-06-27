@@ -13,8 +13,8 @@ def main():
     # TODO: save results to DB
     data_processor = DataProcessor()
     pca_analyser = PCAAnalyser()
-    #df = data_processor.load_data_one_joint('right elbow joint angle')
-    df = data_processor.load_full_device_data('mocap')
+    df = data_processor.load_data_one_joint('right elbow joint angle')
+    #df = data_processor.load_full_device_data('mocap')
     unique_target_axes = df[["target", "axis"]].drop_duplicates().values.tolist()
 
     df_combined_strokes, df_mean_key_total = pd.DataFrame(), pd.DataFrame()
@@ -35,7 +35,7 @@ def main():
         df_mean_key_total = pd.concat([df_mean_key_total, df_mean_key_waveform_target_axis])
         
         # combine half-cycles into full-cycle, transform data (each dp_timepoint into one column) 
-        df_strokes_target_axis = data_processor.combine_half_strokes_to_full_cycles(df_key_normalized)
+        df_strokes_target_axis = data_processor.combine_half_strokes_to_full_cycles_old(df_key_normalized)
         df_combined_strokes = pd.concat([df_combined_strokes, df_strokes_target_axis])
         
         df_transformed = data_processor.pivot_full_cycles_to_wide(df_strokes_target_axis, 'value_centered' )
@@ -71,7 +71,7 @@ def main():
     pcs_final = pd.DataFrame(pcs_final, columns = ['target', 'axis', 'PCA'])        
     scaler_df = pd.DataFrame(scaler_list, columns = ['target', 'axis', 'scaler']) 
     
-    pcs_ranked = pca_analyser.rank_pcs(unique_target_axes, df_combined)
+    pcs_ranked = pca_analyser.rank_pcs(df_combined)
     #pcs_ranked_orig = pca_analyser.rank_pcs(unique_target_axes, df_combined_orig)
     
     max_pcs = 10
@@ -84,7 +84,7 @@ def main():
         axis = current_pc['axis']
         pca_scores = np.array(df_transformed_total[(df_transformed_total['target'] == target) & (df_transformed_total['axis'] == axis)][['PC1', 'PC2', 'PC3']])
         df_pca_scores = df_transformed_total[(df_transformed_total['target'] == target) & (df_transformed_total['axis'] == axis)]
-        df_mean_key_target_axis = df_mean_key_total[(df_mean_key_total['target'] == target) & (df_mean_key_total['axis'] == axis)]
+        #df_mean_key_target_axis = df_mean_key_total[(df_mean_key_total['target'] == target) & (df_mean_key_total['axis'] == axis)]
         scaler = scaler_df[(scaler_df['target'] == target) & (scaler_df['axis'] == axis)]['scaler'].iloc[0]
         # TODO: reconstruct the data from the pc_scores, loading vector and mean note
         

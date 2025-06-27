@@ -141,12 +141,12 @@ class DatapointRepository:
         if exp_id == 1 and device == 'emg':
             query ="""
                 SELECT * FROM [Datapoints MPA Clean EMG]
-                WHERE measurement_time_point = ?
+                WHERE timepoint = ?
             """
         elif exp_id == 1 and device == 'mocap':
             query ="""
                 SELECT * FROM [Datapoints MPA Clean MoCap]
-                WHERE measurement_time_point = ?
+                WHERE timepoint = ?
             """
         cursor.execute(query, (timepoint,))
         rows = cursor.fetchall()
@@ -174,15 +174,52 @@ class DatapointRepository:
         if exp_id == 1 and device == 'emg':
             query ="""
                 SELECT * FROM [Datapoints MPA Clean EMG]
-                WHERE measurement_time_point = ? AND target = ?
+                WHERE timepoint = ? AND target = ?
             """
         elif exp_id == 1 and device == 'mocap':
             query ="""
                 SELECT * FROM [Datapoints MPA Clean MoCap]
-                WHERE measurement_time_point = ? AND target = ?
+                WHERE timepoint = ? AND target = ?
             """
 
         cursor.execute(query, (timepoint, target))
+        rows = cursor.fetchall()
+        if not rows:
+            return None
+        columns = [desc[0] for desc in cursor.description]
+        return pd.DataFrame(rows, columns=columns)
+
+    def get_datapoints_by_exp_id_device_timepoint_target_axis(self, exp_id:int, device:str, timepoint:str, target:str, axis:str = None) -> pd.DataFrame | None:
+        """
+        Retrieves all datapoints associated with a specific experiment ID, measurement device and timepoint by selecting the corresponding 
+        View from the database.
+
+        Args:
+            exp_id (int): The ID of the experiment.
+            device (str): The name of the measurement device (e.g., 'emg').
+            timepoint (str): The name of the measurement timepoint (e.g., 'pre').
+
+        Returns:
+            pd.DataFrame | None: A DataFrame containing datapoint information along with 
+            measurement metadata and participant pain-related fields. Returns None if no data found.
+        """
+        cursor = self.conn.cursor()
+        query = ""
+        if exp_id == 1 and device == 'emg':
+            query ="""
+                SELECT * FROM [Datapoints MPA Clean EMG]
+                WHERE timepoint = ? AND target = ?
+            """
+        elif exp_id == 1 and device == 'mocap':
+            query ="""
+                SELECT * FROM [Datapoints MPA Clean MoCap]
+                WHERE timepoint = ? AND target = ? AND axis = ?
+                
+            """
+        if device == 'emg':
+            cursor.execute(query, (timepoint, target))
+        else:
+            cursor.execute(query, (timepoint, target, axis))
         rows = cursor.fetchall()
         if not rows:
             return None

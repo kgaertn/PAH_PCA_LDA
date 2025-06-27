@@ -8,6 +8,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from data_processing.data_preprocess import DataProcessor
+from data_access.scaler_repo import ScalerRepository
+from data_access.pc_ranked_repo import PCRankedRepository
+from data_access.pc_scores_repository import PCScoresRepository
+from models.scaler import Scaler
+from models.pc_ranked import PC_Ranked
+from models.pc_scores import PC_Scores
 
 # TODO: check PCA requirements: correlations between features should be linear, data set should be free of outliers, variables should be continuous
 # TODO: check PCA rotation
@@ -19,7 +25,9 @@ class PCAAnalyser:
         Initializes the PCA_Analyser with a data processor.
         """    
         self.data_processor = DataProcessor()
-        
+        self.scaler_repo = ScalerRepository()
+        self.pc_ranked_repo = PCRankedRepository()
+        self.pc_scores_repo = PCScoresRepository()
     
     @staticmethod
     def standardize_df(df:pd.DataFrame) -> pd.DataFrame:
@@ -80,21 +88,25 @@ class PCAAnalyser:
             list: A list of lists, each containing:
                 [target, axis, PC name, t-statistic, p-value]
         """
-        pc_cols = df.iloc[:, 5:]
-        target = df['target'][0]
-        axis = df['axis'][0]
+        pc_ids = df['pc_id'].unique()
+        #pc_cols = df.iloc[:, 5:]
+        target = df['target'].iloc[0]
+        axis = df['axis'].iloc[0]
         t_test_result = []
-        for pc in pc_cols:
-            if not df[pc].isna().all():
-                df_pc_mean_stand = df.groupby(['participant_id', 'PRMD_ever'])[pc].mean().reset_index()
-                df_mean_pain = df_pc_mean_stand[df_pc_mean_stand['PRMD_ever'] == 1][pc]
-                df_mean_nopain = df_pc_mean_stand[df_pc_mean_stand['PRMD_ever'] == 0][pc]
-                
-                t_stat, p_value = ttest_ind(df_mean_pain, df_mean_nopain, equal_var=False)
-                t_test_result.append([target, axis, pc, t_stat, p_value])
+        for pc_id in pc_ids:
+            #if not df[pc].isna().all():
+            pc_idx = df[df['pc_id'] == pc_id]['pc_index'].iloc[0]
+            df_pc_mean = df.groupby(['participant_id', 'PRMD_ever'])['pc_score'].mean().reset_index()
+            df_pain = df_pc_mean[df_pc_mean['PRMD_ever'] == 1]['pc_score']
+            df_nopain = df_pc_mean[df_pc_mean['PRMD_ever'] == 0]['pc_score']
+            mean_pain = df_pain.mean()
+            mean_nopain = df_nopain.mean()
+            
+            t_stat, p_value = ttest_ind(df_pain, df_nopain, equal_var=False)
+            t_test_result.append([target, axis, pc_id, pc_idx, t_stat, p_value, mean_pain, mean_nopain])
         return t_test_result
-        
-    def rank_pcs(self,unique_target_axes:list, df:pd.DataFrame):
+       
+    def rank_pcs(self, df:pd.DataFrame):
         """
         Rank principal components (PCs) based on their t-test effect size (absolute t-value)
         across all given (target, axis) combinations.
@@ -108,13 +120,16 @@ class PCAAnalyser:
                         with columns: ['target', 'axis', 'PC', 't_value', 'p_value'].
         """
         #TODO: calculate and return the group mean and SD (pain/no pain) for each PC
+        unique_target_axes = df[['target', 'axis']].drop_duplicates().values.tolist()
+        df_pc_reduced = df[['participant_id', 'PRMD_ever', 'target', 'axis', 'pc_id', 'pc_index', 'pc_score']]
+    
         t_test_total = []
         for target, axis in unique_target_axes:
-            df_target_axis = df[(df["target"] == target) & (df["axis"] == axis)]
+            df_target_axis = df_pc_reduced[(df_pc_reduced["target"] == target) & (df_pc_reduced["axis"] == axis)]
             t_test_target_axis = self.calculate_t_test(df_target_axis)
             t_test_total.extend(t_test_target_axis)
         
-        df_t_test = pd.DataFrame(t_test_total, columns = ['target', 'axis', 'PC', 't_value', 'p_value'])
+        df_t_test = pd.DataFrame(t_test_total, columns = ['target', 'axis', 'pc_id', 'pc_index', 't_value', 'p_value', 'mean_pain', 'mean_no_pain'])
         df_t_test_ranked = df_t_test.sort_values(by="t_value", key=lambda x: x.abs(), ascending=False).reset_index(drop=True)
         return df_t_test_ranked
 
@@ -432,18 +447,19 @@ class PCAAnalyser:
         """
         full_filename = f"{filename}.{file_format}"
         fig.savefig(str(file_path) +'\\' + full_filename, dpi=dpi, format=file_format)
+        plt.close()
         print(f"Plot saved to {full_filename}")
     
     @staticmethod
-    def plot_linearity(df):
+    def plot_linearity(df, fig_title):
         from pandas.plotting import scatter_matrix
         from pandas.plotting import lag_plot
         # Assume 'data' is a DataFrame of shape [n_movements, 202] (flattened over all participants/movements)
         # For demonstration, select every 20th timepoint
-        subset = df.iloc[:, ::20]
+        subset = df.iloc[:, 6::20]
         fig1 = plt.figure(figsize=(12, 12))
         scatter_matrix(subset, ax=fig1.add_subplot(111))
-        plt.suptitle('Scatter Matrix of Selected Timepoints')
+        plt.suptitle(f'Scatter Matrix of Selected Timepoints: {fig_title}')
         plt.tight_layout()
         #plt.show()
 
@@ -469,9 +485,9 @@ class PCAAnalyser:
         plt.xlabel('Value at time t') 
         plt.ylabel('Value at time t+1')
         plt.legend()
-        plt.show()
+        #plt.show()
         
-        #return fig1, fig2, fig3
+        return fig1, fig2
     
     @staticmethod    
     def sliding_window_outlier_detection(df, window=10, threshold=3):
@@ -500,21 +516,62 @@ class PCAAnalyser:
                         count_outliers += 1
                 # Calculate group mean for t0 and t201, as sliding window is unstable at the edges
                 # compare value to group mean to decide if it's an outlier
-                first_col_mean = df_part.drop(index=idx).iloc[:, 5].mean()
-                first_col_std = df_part.drop(index=idx).iloc[:, 5].std()
-                if abs(df_part.iloc[part_row_idx, 5] - first_col_mean) >= threshold * first_col_std:
-                    df_outliers_adj.iloc[idx, 5] = df_part.iloc[:, 5].mean()
+                first_col_mean = df_part.drop(index=idx).iloc[:, -202].mean()
+                first_col_std = df_part.drop(index=idx).iloc[:, -202].std()
+                if abs(df_part.iloc[part_row_idx, -202] - first_col_mean) >= threshold * first_col_std:
+                    df_outliers_adj.iloc[idx, -202] = df_part.iloc[:, -202].mean()
                     count_outliers += 1
                 # For last timepoint (tN)
                 last_col_mean = df_part.drop(index=idx).iloc[:, -1].mean()
                 last_col_std = df_part.drop(index=idx).iloc[:, -1].std()
-                if abs(df_part.iloc[part_row_idx, 5] - last_col_mean) >= threshold * last_col_std:
+                if abs(df_part.iloc[part_row_idx, -202] - last_col_mean) >= threshold * last_col_std:
                     df_outliers_adj.iloc[idx, -1] = df_part.iloc[:, -1].mean()
                     count_outliers += 1
                 part_row_idx += 1
 
                 
         return df_outliers_adj, count_outliers
+    
+    def upload_scaler(self, meas_type_id, scaler_type, mean, scale):
+        """"""
+        scaler = Scaler(
+            id = 1,
+            measurement_type_id=meas_type_id,
+            scaler_type=scaler_type,
+            mean=mean,
+            scale=scale
+        )
+        scaler_id = self.scaler_repo.insert_new_scaler(scaler)
+        return scaler_id
+    
+    def upload_pca(self, meas_type_id, pc_index, loading_vector, explained_variance, data_scaled):
+        """"""
+        pc = PC_Ranked(
+            id = 1,
+            measurement_type_id=meas_type_id,
+            pc_index=pc_index,
+            loading_vector=loading_vector,
+            explained_variance=explained_variance,
+            data_scaled=data_scaled
+        )
+        pc_id = self.pc_ranked_repo.insert_new_pc(pc)
+        return pc_id
+    
+    def upload_pc_scores(self, pc_id, sample_scores):
+        """"""
+        pc_scores = []
+        for sample, score in sample_scores:
+            pc_scores.append(PC_Scores(
+                id = 1,
+                pc_id=pc_id,
+                sample_id=sample,
+                pc_score=score
+            ))
+        self.pc_scores_repo.insert_multiple_pc_scores(pc_scores)
+        
+    def load_pc_data(self, exp_id, device):
+        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device)
+        return df
     #def sliding_window_outlier_detection(df, window=10, threshold=3):
     #    # Create a copy to avoid modifying the original DataFrame
     #    outlier_mask = pd.DataFrame(True, index=df.index, columns=df.columns)
