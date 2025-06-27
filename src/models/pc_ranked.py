@@ -13,6 +13,8 @@ class PC_Ranked:
     explained_variance: Optional[float] = None
     group_mean_pain: Optional[float] = None
     group_mean_no_pain: Optional[float] = None
+    group_std_pain: Optional[float] = None
+    group_std_no_pain: Optional[float] = None
     t_value: Optional[float] = None
     p_value: Optional[float] = None
     pca_info: Optional[str] = None

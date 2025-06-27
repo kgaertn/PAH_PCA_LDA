@@ -156,9 +156,11 @@ class PCAAnalyser:
             df_nopain = df_pc_mean[df_pc_mean['PRMD_ever'] == 0]['pc_score']
             mean_pain = df_pain.mean()
             mean_nopain = df_nopain.mean()
+            std_pain = df_pain.std()
+            std_nopain = df_nopain.std()
             
             t_stat, p_value = ttest_ind(df_pain, df_nopain, equal_var=False)
-            t_test_result.append([target, axis, pc_id, pc_idx, t_stat, p_value, mean_pain, mean_nopain])
+            t_test_result.append([target, axis, pc_id, pc_idx, t_stat, p_value, mean_pain, mean_nopain, std_pain, std_nopain])
         return t_test_result
        
     def rank_pcs(self, df:pd.DataFrame):
@@ -184,7 +186,7 @@ class PCAAnalyser:
             t_test_target_axis = self.calculate_t_test(df_target_axis)
             t_test_total.extend(t_test_target_axis)
         
-        df_t_test = pd.DataFrame(t_test_total, columns = ['target', 'axis', 'pc_id', 'pc_index', 't_value', 'p_value', 'mean_pain', 'mean_no_pain'])
+        df_t_test = pd.DataFrame(t_test_total, columns = ['target', 'axis', 'pc_id', 'pc_index', 't_value', 'p_value', 'mean_pain', 'mean_no_pain', 'std_pain', 'std_no_pain'])
         df_t_test_ranked = df_t_test.sort_values(by="t_value", key=lambda x: x.abs(), ascending=False).reset_index(drop=True)
         return df_t_test_ranked
 
@@ -710,6 +712,8 @@ class PCAAnalyser:
                 rank = idx + 1,
                 group_mean_pain=row['mean_pain'],
                 group_mean_no_pain=row['mean_no_pain'],
+                group_std_pain=row['std_pain'],
+                group_std_no_pain=row['std_no_pain'],
                 t_value=row['t_value'],
                 p_value=row['p_value']                
             ))

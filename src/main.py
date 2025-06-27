@@ -11,6 +11,9 @@ def main():
     pca_analyser = PCAAnalyser()
     # setup the db adjustments
     samples_setup = True
+    existing_targets_analysed = True
+    t_test_results_uploaded = False
+    
     if not samples_setup:
         adjusted_db_setup()
         #data_processor.create_samples()
@@ -20,7 +23,7 @@ def main():
     device = 'mocap'
     existing_target_axes = data_processor.get_existing_target_axis_MPA_Clean(device)
     
-    existing_targets_analysed = True
+    
     if not existing_targets_analysed:
         for target, axis in existing_target_axes:
             df = data_processor.load_MPA_clean_data_by_device_tp_target_axis(device, measurement_tp, target, axis)
@@ -80,7 +83,7 @@ def main():
             #print("")
             print(f"{target} {axis} analysed and saved")
     # select the PCs and PCscores, as well as participant information (pain/no pain)
-    t_test_results_uploaded = True
+    
     if not t_test_results_uploaded:
         pca_df = pca_analyser.load_pc_data(1, device)
         t_test_results = pca_analyser.rank_pcs(pca_df)

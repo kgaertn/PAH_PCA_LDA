@@ -42,9 +42,10 @@ class PCRankedRepository:
         cursor.executemany("""
             UPDATE pcs_ranked
             SET rank = ?, group_mean_pain = ?, group_mean_no_pain = ?, 
+            group_std_pain = ?, group_std_no_pain = ?, 
             t_value = ?, p_value = ?
             WHERE id = ?
-        """, [(pc.rank, pc.group_mean_pain, pc.group_mean_no_pain, pc.t_value, pc.p_value, pc.id) for pc in t_test_results])
+        """, [(pc.rank, pc.group_mean_pain, pc.group_mean_no_pain, pc.group_std_pain, pc.group_std_no_pain, pc.t_value, pc.p_value, pc.id) for pc in t_test_results])
         self.conn.commit()
         #return cursor.lastrowid
 
