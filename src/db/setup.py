@@ -7,6 +7,9 @@ def adjusted_db_setup():
     create_datapoints_MPA_view()
     create_datapoints_MPA_device_view('MoCap', 'mocap')
     create_datapoints_MPA_device_view('EMG', 'emg')
+    create_PCA_View()
+    fill_measurement_type_table()
+    add_measurement_type_id_to_measurement()
         
 
 def create_tables():
@@ -103,18 +106,21 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS pcs_ranked (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             measurement_type_id INTEGER,
+            scaler_id INTEGER NULL,
             pc_index INTEGER,
             loading_vector TEXT,
             rank INTEGER,
             explained_variance REAL,
             group_mean_pain REAL, 
             group_mean_no_pain REAL,
+            group_std_pain REAL, 
+            group_std_no_pain REAL,
             t_value REAL,
             p_value REAL,
             data_scaled INTEGER,
             pca_info TEXT,
             FOREIGN KEY (measurement_type_id) REFERENCES measurement_type(id)
-            UNIQUE (measurement_type_id, pc_index)
+            UNIQUE (measurement_type_id, scaler_id, pc_index, data_scaled)
         )
     """)
     
@@ -292,6 +298,7 @@ def fill_measurement_type_table():
         FROM measurement m
         JOIN participant p ON m.participant_id = p.id;
     """)
+    conn.commit()
     
 def add_measurement_type_id_to_measurement():
     #TODO
@@ -311,6 +318,7 @@ def add_measurement_type_id_to_measurement():
             )
             WHERE measurement_type_id IS NULL;
     """)
+    conn.commit()
         
 
 if __name__ == "__main__":

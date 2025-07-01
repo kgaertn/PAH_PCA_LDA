@@ -582,7 +582,7 @@ class PCAAnalyser:
         from pandas.plotting import lag_plot
         # Assume 'data' is a DataFrame of shape [n_movements, 202] (flattened over all participants/movements)
         # For demonstration, select every 20th timepoint
-        subset = df.iloc[:, 6::20]
+        subset = df.iloc[:, -202::20]
         fig1 = plt.figure(figsize=(12, 12))
         scatter_matrix(subset, ax=fig1.add_subplot(111))
         plt.suptitle(f'Scatter Matrix of Selected Timepoints: {fig_title}')
@@ -607,7 +607,7 @@ class PCAAnalyser:
             flattened = pd.Series(np.ravel(df_part))
             lag_plot(flattened, lag=1, alpha=0.4, c=plt.cm.tab20(i), label=f'Sample {i+1}')
             #lag_plot(df.iloc[i, :], lag=1, alpha=0.4, c=plt.cm.tab20(i), label=f'Sample {i+1}')
-        plt.title('Lag Plots for all participants Samples')
+        plt.title(f'Lag Plot for all participants Samples: {fig_title}')
         plt.xlabel('Value at time t') 
         plt.ylabel('Value at time t+1')
         plt.legend()
@@ -670,11 +670,12 @@ class PCAAnalyser:
         scaler_id = self.scaler_repo.insert_new_scaler(scaler)
         return scaler_id
     
-    def upload_pca(self, meas_type_id, pc_index, loading_vector, explained_variance, data_scaled):
+    def upload_pca(self, meas_type_id, pc_index, loading_vector, explained_variance, data_scaled, scaler_id):
         """"""
         pc = PC_Ranked(
             id = 1,
             measurement_type_id=meas_type_id,
+            scaler_id = scaler_id,
             pc_index=pc_index,
             loading_vector=loading_vector,
             explained_variance=explained_variance,

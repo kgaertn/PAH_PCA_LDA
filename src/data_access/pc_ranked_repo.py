@@ -22,9 +22,9 @@ class PCRankedRepository:
         """
         cursor = self.conn.cursor()
         cursor.execute("""
-            INSERT OR IGNORE INTO pcs_ranked (measurement_type_id, pc_index, loading_vector, explained_variance, data_scaled)
-            VALUES (?, ?, ?, ?, ?)
-        """, (pc.measurement_type_id, pc.pc_index, pc.loading_vector_to_json(), pc.explained_variance, pc.data_scaled))
+            INSERT OR IGNORE INTO pcs_ranked (measurement_type_id, scaler_id, pc_index, loading_vector, explained_variance, data_scaled)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (pc.measurement_type_id, pc.scaler_id, pc.pc_index, pc.loading_vector_to_json(), pc.explained_variance, pc.data_scaled))
         self.conn.commit()
         return cursor.lastrowid
     

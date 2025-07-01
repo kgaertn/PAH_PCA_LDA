@@ -339,12 +339,12 @@ class DataProcessor:
             pd.DataFrame: Wide-format DataFrame with one row per full stroke and 202 value columns.
         """
         wide_df = df.pivot_table(
-            index=["participant_id", "measurement_id", "PRMD_ever", 'target', 'axis', "sample_id"],
+            index=["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 'target', 'axis', "sample_id"],
             columns="dp_time_point",
             values= value
         ).reset_index()
 
-        wide_df.columns = ['participant_id', "measurement_id", 'PRMD_ever', 'target', 'axis', 'sample_id'] + [f"t{int(col)}" for col in wide_df.columns[-202:]]
+        wide_df.columns = ['participant_id', "measurement_id","measurement_type_id", 'PRMD_ever', 'target', 'axis', 'sample_id'] + [f"t{int(col)}" for col in wide_df.columns[-202:]]
 
         return wide_df
 
