@@ -31,33 +31,33 @@ class PCScoresRepository:
 # use these functions to access data from the experiment table, depending on the needs
 # TODO
 
-    def get_pc_scores_by_exp_id_device(self, exp_id, device):
+    def get_pc_scores_by_exp_id_device(self, exp_id, device, meas_timepoint):
         """
         Returns a Dataframe from the Participants PCs table.
         """
         cursor = self.conn.cursor()
         query = """
             SELECT * FROM [Participants PCs]
-            WHERE exp_id = ? AND device = ?
+            WHERE exp_id = ? AND device = ? AND meas_time_point = ?
         """
-        cursor.execute(query, (exp_id,device))
+        cursor.execute(query, (exp_id, device, meas_timepoint))
         rows = cursor.fetchall()
         if not rows:
             return None
         columns = [desc[0] for desc in cursor.description]
         return pd.DataFrame(rows, columns=columns)
     
-    def get_pc_scores_by_rank(self, exp_id, device, min_rank, max_rank):
+    def get_pc_scores_by_tp_rank(self, exp_id, device, meas_timepoint, min_rank, max_rank):
         """
         Returns a Dataframe from the Participants PCs table.
         """
         cursor = self.conn.cursor()
         query = """
             SELECT * FROM [Participants PCs]
-            WHERE exp_id = ? AND device = ? AND rank BETWEEN ? AND ?
+            WHERE exp_id = ? AND device = ? AND meas_time_point = ? AND rank BETWEEN ? AND ?
             ORDER BY rank
         """
-        cursor.execute(query, (exp_id, device, min_rank, max_rank))
+        cursor.execute(query, (exp_id, device, meas_timepoint, min_rank, max_rank))
         rows = cursor.fetchall()
         if not rows:
             return None

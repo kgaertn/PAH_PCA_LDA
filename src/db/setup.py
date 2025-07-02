@@ -146,6 +146,7 @@ def create_tables():
             scale TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (measurement_type_id) REFERENCES measurement_type(id)
+            UNIQUE (measurement_type_id, scaler_type)
         );
     """)
     

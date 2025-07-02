@@ -20,8 +20,7 @@ class SetupUploader:
     def run_create_samples(self):
         self.data_processor.create_samples()
     
-    def load_and_process_data_for_pca(self, device, measurement_tp, target, axis):
-        
+    def load_data_for_pca(self, device, measurement_tp, target, axis):
         df = self.data_processor.load_MPA_clean_data_by_device_tp_target_axis(device, measurement_tp, target, axis)
         print(f"{target} {axis} loaded")
     # select the correct participants, based on their pain location
@@ -33,7 +32,12 @@ class SetupUploader:
             'measurement_id', 'measurement_type_id', 'target', 'axis', 'sample_id', 'bow_stroke', 'up_down', 'key', 'dp_time_point',
             'value'
         ]]
-        df_sorted = df_reduced.sort_values(by=['participant_id', 'bow_stroke', 'up_down', 'dp_time_point'])    
+        df_sorted = df_reduced.sort_values(by=['participant_id', 'bow_stroke', 'up_down', 'dp_time_point'])  
+        df_sorted_transformed = self.data_processor.pivot_full_cycles_to_wide(df_sorted, 'value')
+          
+        return df_sorted, df_sorted_transformed
+
+    def process_data_for_pca(self, df_sorted):
 
         # subtract the key mean-waveform from each sample
         # TODO: save mean key per target/axis? / plot mean key? 

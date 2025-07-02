@@ -2,10 +2,13 @@
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 from scipy.stats import ttest_ind
+from factor_analyzer import calculate_bartlett_sphericity
+from factor_analyzer.factor_analyzer import calculate_kmo
 import re
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import seaborn as sns
 
 from data_processing.data_preprocess import DataProcessor
 from data_access.scaler_repo import ScalerRepository
@@ -349,40 +352,42 @@ class PCAAnalyser:
         
         
         return lower_band, upper_band
-    @staticmethod
-    def calculate_lower_upper_band_unscaled_old(pc_scores, mean_waveform, loading_vector, scaler):
-        """
-        Calculates the lower and upper reconstruction bands in the original data scale 
-        using inverse transformation of scaled loadings.
+    #@staticmethod
+    #def calculate_lower_upper_band_unscaled_old(pc_scores, mean_waveform, loading_vector, scaler):
+    #    """
+    #    Calculates the lower and upper reconstruction bands in the original data scale 
+    #    using inverse transformation of scaled loadings.
+#
+    #    Args:
+    #        pc_scores (np.ndarray): The PCA scores for a single component.
+    #        mean_waveform (np.ndarray): The mean waveform to which variation is added.
+    #        loading_vector (np.ndarray): Loading vector used to scale the variation.
+    #        scaler (StandardScaler): Scaler used to inverse-transform the waveform.
+#
+    #    Returns:
+    #        tuple[np.ndarray, np.ndarray]: Arrays representing the lower and upper waveform bands.
+    #    """
+    #    
+    #    lower_percentile =    np.percentile(pc_scores, 5)
+    #    upper_percentile = np.percentile(pc_scores, 95)
+    #    
+    #    lower_band_scaled = lower_percentile * loading_vector
+    #    upper_band_scaled = upper_percentile * loading_vector
+    #    
+    #    # Convert to 2D arrays (required by inverse_transform)
+    #    lower_band_scaled_2d = lower_band_scaled.reshape(1, -1)
+    #    upper_band_scaled_2d = upper_band_scaled.reshape(1, -1)
+    #    
+    #    lower_band_original = scaler.inverse_transform(lower_band_scaled_2d)[0]
+    #    upper_band_original = scaler.inverse_transform(upper_band_scaled_2d)[0]
+    #    
+    #    lower_band = mean_waveform + lower_band_original
+    #    upper_band = mean_waveform + upper_band_original
+    #    
+    #    
+    #    return lower_band, upper_band
+    
 
-        Args:
-            pc_scores (np.ndarray): The PCA scores for a single component.
-            mean_waveform (np.ndarray): The mean waveform to which variation is added.
-            loading_vector (np.ndarray): Loading vector used to scale the variation.
-            scaler (StandardScaler): Scaler used to inverse-transform the waveform.
-
-        Returns:
-            tuple[np.ndarray, np.ndarray]: Arrays representing the lower and upper waveform bands.
-        """
-        
-        lower_percentile =    np.percentile(pc_scores, 5)
-        upper_percentile = np.percentile(pc_scores, 95)
-        
-        lower_band_scaled = lower_percentile * loading_vector
-        upper_band_scaled = upper_percentile * loading_vector
-        
-        # Convert to 2D arrays (required by inverse_transform)
-        lower_band_scaled_2d = lower_band_scaled.reshape(1, -1)
-        upper_band_scaled_2d = upper_band_scaled.reshape(1, -1)
-        
-        lower_band_original = scaler.inverse_transform(lower_band_scaled_2d)[0]
-        upper_band_original = scaler.inverse_transform(upper_band_scaled_2d)[0]
-        
-        lower_band = mean_waveform + lower_band_original
-        upper_band = mean_waveform + upper_band_original
-        
-        
-        return lower_band, upper_band
         
     def reconstruct_single_component(self, pc_df, orig_df, scaler):
         """
@@ -407,17 +412,19 @@ class PCAAnalyser:
         pc_idx = pc_df['pc_index'].unique()[0]
         
         loading_vector = np.array(PC_Ranked.list_from_json(pc_df['loading_vector'].unique()[0]))
+        pc_scores_df_pain = pc_df[pc_df['PRMD_ever'] == 1]
+        pc_scores_df_nopain = pc_df[pc_df['PRMD_ever'] == 0]
         pc_scores = np.array(pc_df['pc_score'])
-        #pc_idx = self.extract_PCA_index(ranked_pc['PC'])
+        pc_scores_pain = np.array(pc_scores_df_pain['pc_score'])
+        pc_scores_nopain = np.array(pc_scores_df_nopain['pc_score'])
         
-        #pca_target_axis = pcs_final[(pcs_final['target'] == target) & (pcs_final['axis'] == axis)]['PCA']
-        #loading_vector = pca_target_axis.iloc[0].components_[pc_idx]
-        #pc_scores = np.array(pca_scores[['PC1', 'PC2', 'PC3']])[:, pc_idx]
         
         # update the mean calculation
         mean_waveform_pain, mean_waveform_no_pain, mean_waveform_total = self.calculate_mean_waveform_target_axis(orig_df)       
         
-        lower_band, upper_band = self.calculate_lower_upper_band_unscaled(pc_scores, mean_waveform_total, loading_vector, scaler)
+        lower_band_pain, upper_band_pain = self.calculate_lower_upper_band_unscaled(pc_scores_pain, mean_waveform_total, loading_vector, scaler)
+        lower_band_nopain, upper_band_nopain = self.calculate_lower_upper_band_unscaled(pc_scores_nopain, mean_waveform_total, loading_vector, scaler)
+        lower_band, upper_band = self.calculate_lower_upper_band_unscaled(pc_scores, mean_waveform_total, loading_vector, scaler)        
         
         return {
         "mean_waveform_pain": mean_waveform_pain,
@@ -426,13 +433,18 @@ class PCAAnalyser:
         "loading_vector": loading_vector,
         "pc_scores": pc_scores,
         "lower_band": lower_band,
-        "upper_band": upper_band
+        "upper_band": upper_band,
+        "lower_band_pain": lower_band_pain,
+        "upper_band_pain": upper_band_pain,
+        "lower_band_no_pain": lower_band_nopain,
+        "upper_band_no_pain": upper_band_nopain
         }
 
-    #def reconstruct_single_component(self, ranked_pc, pcs_final, pca_scores, df, scaler, mean_note_waveform):
+
+    #def reconstruct_single_component_old(self, ranked_pc, pcs_final, pca_scores, df, scaler):
     #    """
-    #    Reconstructs a waveform from a single principal component and calculates corresponding
-    #    waveform bands and summary statistics.
+    #    Reconstructs a waveform from a single principal component without using 
+    #    pre-combined mean waveforms.
 #
     #    Args:
     #        ranked_pc (pd.Series): Metadata describing the selected PCA component (e.g., PC, target, axis).
@@ -440,11 +452,10 @@ class PCAAnalyser:
     #        pca_scores (pd.DataFrame): PCA score data used for reconstruction.
     #        df (pd.DataFrame): Original input data used for mean waveform calculation.
     #        scaler (StandardScaler): Scaler used for inverse-transforming PCA outputs.
-    #        mean_note_waveform (pd.DataFrame): DataFrame with mean waveforms used in reconstruction.
 #
     #    Returns:
     #        dict: A dictionary containing the reconstructed waveform, loading vector, PCA scores,
-    #            and the lower and upper reconstruction bands.
+    #            and the lower and upper reconstruction bands (in original scale).
     #    """
     #    
     #    target = ranked_pc['target']
@@ -455,13 +466,11 @@ class PCAAnalyser:
     #    loading_vector = pca_target_axis.iloc[0].components_[pc_idx]
     #    pc_scores = np.array(pca_scores[['PC1', 'PC2', 'PC3']])[:, pc_idx]
     #    
-    #    # reconstruct data 
-    #    df_reconstructed = self.reconstruct_data(scaler, pca_scores, pc_idx, mean_note_waveform, loading_vector)
-    #    
     #    # update the mean calculation
-    #    mean_waveform_pain, mean_waveform_no_pain, mean_waveform_total = self.calculate_mean_waveform_target_axis(df_reconstructed)       
+    #    mean_waveform_pain, mean_waveform_no_pain, mean_waveform_total = self.calculate_mean_waveform_target_axis(df)
     #    
-    #    lower_band, upper_band = self.calculate_lower_upper_band(pc_scores, mean_waveform_pain, loading_vector)
+    #    #lower_band, upper_band = self.calculate_lower_upper_band(pc_scores, mean_waveform_pain, loading_vector)
+    #    lower_band, upper_band = self.calculate_lower_upper_band_unscaled(pc_scores, mean_waveform_pain, loading_vector, scaler)
     #    
     #    return {
     #    "mean_waveform_pain": mean_waveform_pain,
@@ -473,46 +482,53 @@ class PCAAnalyser:
     #    "upper_band": upper_band
     #    }
 
-    def reconstruct_single_component_old(self, ranked_pc, pcs_final, pca_scores, df, scaler):
+    @staticmethod
+    def plot_PCA_reconstruction_per_group(component_data, title_waveform="Mean Waveform", title_loading="Loading Vector"):
         """
-        Reconstructs a waveform from a single principal component without using 
-        pre-combined mean waveforms.
+        Plots the reconstructed mean waveforms with percentile bands and the corresponding 
+        loading vector of a PCA component.
 
         Args:
-            ranked_pc (pd.Series): Metadata describing the selected PCA component (e.g., PC, target, axis).
-            pcs_final (pd.DataFrame): DataFrame containing trained PCA models per target and axis.
-            pca_scores (pd.DataFrame): PCA score data used for reconstruction.
-            df (pd.DataFrame): Original input data used for mean waveform calculation.
-            scaler (StandardScaler): Scaler used for inverse-transforming PCA outputs.
+            component_data (dict): Output dictionary from a reconstruction method containing waveform and PCA info.
+            title_waveform (str): Title for the mean waveform plot.
+            title_loading (str): Title for the loading vector plot.
 
         Returns:
-            dict: A dictionary containing the reconstructed waveform, loading vector, PCA scores,
-                and the lower and upper reconstruction bands (in original scale).
+            tuple[matplotlib.figure.Figure, list[matplotlib.axes._axes.Axes]]: The figure and axes objects for further customization or saving.
         """
         
-        target = ranked_pc['target']
-        axis = ranked_pc['axis']
-        pc_idx = self.extract_PCA_index(ranked_pc['PC'])
+        mean_waveform_pain = component_data['mean_waveform_pain']
+        mean_waveform_no_pain = component_data['mean_waveform_no_pain']
+        lower_band_pain = component_data['lower_band_pain']
+        upper_band_pain = component_data['upper_band_pain']
+        lower_band_nopain = component_data['lower_band_no_pain']
+        upper_band_nopain = component_data['upper_band_no_pain']
+        loading_vector = component_data['loading_vector']
         
-        pca_target_axis = pcs_final[(pcs_final['target'] == target) & (pcs_final['axis'] == axis)]['PCA']
-        loading_vector = pca_target_axis.iloc[0].components_[pc_idx]
-        pc_scores = np.array(pca_scores[['PC1', 'PC2', 'PC3']])[:, pc_idx]
+        fig, axs = plt.subplots(2, 1, figsize=(10, 8), constrained_layout=True)
+    
+        # Plot mean waveforms
+        axs[0].plot(mean_waveform_pain, label="Pain", color="red")
+        axs[0].plot(mean_waveform_no_pain, label="No Pain", color="blue")
+        axs[0].plot(lower_band_pain, label="Lower Band Pain", linestyle='--', color="orange")
+        axs[0].plot(upper_band_pain, label="Upper Band Pain", linestyle=':', color="orange")
+        axs[0].plot(lower_band_nopain, label="Lower Band No Pain", linestyle='--', color="purple")
+        axs[0].plot(upper_band_nopain, label="Upper Band No Pain", linestyle=':', color="purple")
         
-        # update the mean calculation
-        mean_waveform_pain, mean_waveform_no_pain, mean_waveform_total = self.calculate_mean_waveform_target_axis(df)
+        axs[0].set_title(title_waveform)
+        axs[0].set_xlabel("Normalized time (%)")
+        axs[0].set_ylabel("Amplitude (°)")
+        axs[0].legend()
+        axs[0].grid(True)
         
-        #lower_band, upper_band = self.calculate_lower_upper_band(pc_scores, mean_waveform_pain, loading_vector)
-        lower_band, upper_band = self.calculate_lower_upper_band_unscaled(pc_scores, mean_waveform_pain, loading_vector, scaler)
+        # Plot loading vector
+        axs[1].plot(loading_vector, color="green")
+        axs[1].set_title(title_loading)
+        axs[1].set_xlabel("Component Index")
+        axs[1].set_ylabel("Loading Value")
+        axs[1].grid(True)
         
-        return {
-        "mean_waveform_pain": mean_waveform_pain,
-        "mean_waveform_no_pain": mean_waveform_no_pain,
-        "mean_waveform_total": mean_waveform_total,
-        "loading_vector": loading_vector,
-        "pc_scores": pc_scores,
-        "lower_band": lower_band,
-        "upper_band": upper_band
-        }
+        return fig, axs  
     
     @staticmethod
     def plot_PCA_reconstruction(component_data, title_waveform="Mean Waveform", title_loading="Loading Vector"):
@@ -615,48 +631,93 @@ class PCAAnalyser:
         
         return fig1, fig2
     
-    @staticmethod    
+    @staticmethod
     def sliding_window_outlier_detection(df, window=10, threshold=3):
-        # Sliding window (window size = 10) for datapoints t1 - t200
-        #data
         df_outliers_adj = df.copy()
         count_outliers = 0
-        
-        unique_participants = df['participant_id'].unique()
-        for participant in unique_participants:
-            df_part = df[df['participant_id']==participant]
-            part_row_idx = 0
-            for idx, row in df_part.iloc[:, -202:].iterrows():
-                series = row.values
-                for i in range(len(series)):
-                    # Skip first and last datapoints
-                    if i == 0 or i == len(series) - 1:
-                        continue
-                    start = max(0, i - window // 2)
-                    end = min(len(series), i + window // 2 + 1)
-                    window_vals = np.delete(series[start:end], np.where(np.arange(start, end) == i - start))
-                    mean = np.mean(window_vals)
-                    std = np.std(window_vals)
-                    if std > 0 and abs(series[i] - mean) > threshold * std:
-                        df_outliers_adj.at[idx, df.columns[i+5]] = df[df.columns[i+5]].mean()
-                        count_outliers += 1
-                # Calculate group mean for t0 and t201, as sliding window is unstable at the edges
-                # compare value to group mean to decide if it's an outlier
-                first_col_mean = df_part.drop(index=idx).iloc[:, -202].mean()
-                first_col_std = df_part.drop(index=idx).iloc[:, -202].std()
-                if abs(df_part.iloc[part_row_idx, -202] - first_col_mean) >= threshold * first_col_std:
-                    df_outliers_adj.iloc[idx, -202] = df_part.iloc[:, -202].mean()
-                    count_outliers += 1
-                # For last timepoint (tN)
-                last_col_mean = df_part.drop(index=idx).iloc[:, -1].mean()
-                last_col_std = df_part.drop(index=idx).iloc[:, -1].std()
-                if abs(df_part.iloc[part_row_idx, -202] - last_col_mean) >= threshold * last_col_std:
-                    df_outliers_adj.iloc[idx, -1] = df_part.iloc[:, -1].mean()
-                    count_outliers += 1
-                part_row_idx += 1
 
-                
+        time_cols = df.columns[-202:]
+        static_cols = df.columns.difference(time_cols)
+
+        for participant, df_part in df.groupby("participant_id"):
+            data = df_part[time_cols].to_numpy()
+            n_rows, n_cols = data.shape
+
+            for row_idx in range(n_rows):
+                series = data[row_idx]
+
+                # Sliding window: generate shape (n_cols - window + 1, window)
+                # Handle each timepoint individually
+                for i in range(1, n_cols - 1):  # skip t0 and tN for now
+                    start = max(0, i - window // 2)
+                    end = min(n_cols, i + window // 2 + 1)
+                    window_vals = np.delete(series[start:end], i - start)
+                    mean = window_vals.mean()
+                    std = window_vals.std()
+                    if std > 0 and abs(series[i] - mean) > threshold * std:
+                        df_outliers_adj.loc[df_part.index[row_idx], time_cols[i]] = series.mean()
+                        count_outliers += 1
+
+                # Edge points: t0
+                t0_vals = np.delete(data[:, 0], row_idx)
+                t0_mean = t0_vals.mean()
+                t0_std = t0_vals.std()
+                if t0_std > 0 and abs(series[0] - t0_mean) > threshold * t0_std:
+                    df_outliers_adj.loc[df_part.index[row_idx], time_cols[0]] = t0_mean
+                    count_outliers += 1
+
+                # Edge points: tN
+                tN_vals = np.delete(data[:, -1], row_idx)
+                tN_mean = tN_vals.mean()
+                tN_std = tN_vals.std()
+                if tN_std > 0 and abs(series[-1] - tN_mean) > threshold * tN_std:
+                    df_outliers_adj.loc[df_part.index[row_idx], time_cols[-1]] = tN_mean
+                    count_outliers += 1
+
         return df_outliers_adj, count_outliers
+    
+    #@staticmethod    
+    #def sliding_window_outlier_detection(df, window=10, threshold=3):
+    #    # Sliding window (window size = 10) for datapoints t1 - t200
+    #    #data
+    #    df_outliers_adj = df.copy()
+    #    count_outliers = 0
+    #    
+    #    unique_participants = df['participant_id'].unique()
+    #    for participant in unique_participants:
+    #        df_part = df[df['participant_id']==participant]
+    #        part_row_idx = 0
+    #        for idx, row in df_part.iloc[:, -202:].iterrows():
+    #            series = row.values
+    #            for i in range(len(series)):
+    #                # Skip first and last datapoints
+    #                if i == 0 or i == len(series) - 1:
+    #                    continue
+    #                start = max(0, i - window // 2)
+    #                end = min(len(series), i + window // 2 + 1)
+    #                window_vals = np.delete(series[start:end], np.where(np.arange(start, end) == i - start))
+    #                mean = np.mean(window_vals)
+    #                std = np.std(window_vals)
+    #                if std > 0 and abs(series[i] - mean) > threshold * std:
+    #                    df_outliers_adj.at[idx, df.columns[i+5]] = df[df.columns[i+5]].mean()
+    #                    count_outliers += 1
+    #            # Calculate group mean for t0 and t201, as sliding window is unstable at the edges
+    #            # compare value to group mean to decide if it's an outlier
+    #            first_col_mean = df_part.drop(index=idx).iloc[:, -202].mean()
+    #            first_col_std = df_part.drop(index=idx).iloc[:, -202].std()
+    #            if abs(df_part.iloc[part_row_idx, -202] - first_col_mean) >= threshold * first_col_std:
+    #                df_outliers_adj.iloc[idx, -202] = df_part.iloc[:, -202].mean()
+    #                count_outliers += 1
+    #            # For last timepoint (tN)
+    #            last_col_mean = df_part.drop(index=idx).iloc[:, -1].mean()
+    #            last_col_std = df_part.drop(index=idx).iloc[:, -1].std()
+    #            if abs(df_part.iloc[part_row_idx, -202] - last_col_mean) >= threshold * last_col_std:
+    #                df_outliers_adj.iloc[idx, -1] = df_part.iloc[:, -1].mean()
+    #                count_outliers += 1
+    #            part_row_idx += 1
+#
+    #            
+    #    return df_outliers_adj, count_outliers
     
     def upload_scaler(self, meas_type_id, scaler_type, mean, scale):
         """"""
@@ -696,12 +757,12 @@ class PCAAnalyser:
             ))
         self.pc_scores_repo.insert_multiple_pc_scores(pc_scores)
         
-    def load_pc_data(self, exp_id, device):
-        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device)
+    def load_pc_data(self, exp_id, device, meas_timepoint):
+        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device, meas_timepoint)
         return df
     
-    def load_pcs_by_rank(self, exp_id, device, min_rank, max_rank):
-        df = self.pc_scores_repo.get_pc_scores_by_rank(exp_id, device, min_rank, max_rank)
+    def load_pcs_by_rank(self, exp_id, device, meas_tp, min_rank, max_rank):
+        df = self.pc_scores_repo.get_pc_scores_by_tp_rank(exp_id, device,meas_tp, min_rank, max_rank)
         return df
     
     def upload_t_test_results(self, df):
@@ -720,8 +781,52 @@ class PCAAnalyser:
             ))
         self.pc_ranked_repo.update_multiple_t_test_info(t_test_results)
    
-    def load_specific_scaler(self, meas_type_id):
-        return self.scaler_repo.get_sacler_by_meas_type_id(meas_type_id)         
+    def load_specific_scaler(self, meas_type_id, scaler_type):
+        return self.scaler_repo.get_sacler_by_meas_type_id_scaler_type(meas_type_id, scaler_type)         
+    
+    @staticmethod    
+    def calculate_kaiser_meyer_olkin(df):
+        kmo_all, kmo_model = calculate_kmo(df)
+        if kmo_model < 0.9:
+            print("KMO per variable:", kmo_all)
+            print("Overall KMO:", kmo_model)
+    
+    @staticmethod
+    def calculate_bartlett_test_for_spericity(df):
+        corr_matrix = df.corr()
+        corr_det = np.linalg.det(corr_matrix)
+        if corr_det > 0:
+            print("Determinante der Korrelationsmatrix:", corr_det)
+        
+        chi_square_value, p_value = calculate_bartlett_sphericity(df)
+        if p_value > 0:
+            print("Bartlett's Test")
+            print("Chi-Square:", chi_square_value)
+            print("p-value:", p_value)
+
+    @staticmethod
+    def compute_corr_matrix(df):
+        corr_matrix = df.corr(method='pearson')
+        print(corr_matrix)
+        return corr_matrix
+    
+    @staticmethod    
+    def plot_corr_matrix(corr_matrix, target, axis):
+        fig = plt.figure(figsize=(10, 8))
+        annotate = corr_matrix.shape[0] <= 20
+        sns.heatmap(corr_matrix, annot=annotate, fmt=".2f",vmin=0, vmax=1, cmap='coolwarm', square=True)
+        plt.title(f'Correlation Matrix Heatmap: {target}, {axis}')
+        #plt.show()
+        return fig
+        
+    def check_pca_requirements(self, df, target, axis):
+        corr_matrix = self.compute_corr_matrix(df)
+        fig = self.plot_corr_matrix(corr_matrix, target, axis)
+        return fig
+        #self.save_plot()
+        #self.calculate_bartlett_test_for_spericity(df)
+        #self.calculate_kaiser_meyer_olkin(df)
+        
         
     #def sliding_window_outlier_detection(df, window=10, threshold=3):
     #    # Create a copy to avoid modifying the original DataFrame

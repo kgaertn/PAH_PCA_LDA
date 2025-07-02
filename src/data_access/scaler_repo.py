@@ -45,4 +45,18 @@ class ScalerRepository:
             return Scaler(id=row[0], measurement_type_id=row[1], scaler_type=row[2], 
                               mean = Scaler.list_from_json(row[3]), scale = Scaler.list_from_json(row[4]))
         return None
+    
+    def get_sacler_by_meas_type_id_scaler_type(self, meas_type_id, scaler_type):
+        """
+        Returns a set of (measurement_id, bow_stroke_start) tuples from the sample table.
+        """
+        cursor = self.conn.cursor()
+        cursor.execute("""
+                       SELECT * FROM scaler WHERE measurement_type_id = ? AND scaler_type = ?;""",
+                       (meas_type_id,scaler_type))
+        row = cursor.fetchone()
+        if row:
+            return Scaler(id=row[0], measurement_type_id=row[1], scaler_type=row[2], 
+                              mean = Scaler.list_from_json(row[3]), scale = Scaler.list_from_json(row[4]))
+        return None
 # endregion Getter
