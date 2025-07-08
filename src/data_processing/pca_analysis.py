@@ -1,7 +1,8 @@
     
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
-from scipy.stats import ttest_ind
+#from scipy.stats import ttest_ind
+#from scipy.stats import ttest_ind
 from factor_analyzer import calculate_bartlett_sphericity
 from factor_analyzer.factor_analyzer import calculate_kmo
 import re
@@ -9,6 +10,8 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
+import scipy.stats as st
+from pathlib import Path
 
 from data_processing.data_preprocess import DataProcessor
 from data_access.scaler_repo import ScalerRepository
@@ -18,9 +21,9 @@ from models.scaler import Scaler
 from models.pc_ranked import PC_Ranked
 from models.pc_scores import PC_Scores
 
-# TODO: check PCA requirements: correlations between features should be linear, data set should be free of outliers, variables should be continuous
+# TODO: check PCA requirements: double check outlier removal (and add an option to mark the outliers in the db)
 # TODO: check PCA rotation
-# TODO: create plots per group (PCA features per group)
+
 class PCAAnalyser:
     
     def __init__(self):
@@ -72,8 +75,7 @@ class PCAAnalyser:
         explained_variance = pca_stand.explained_variance_ratio_
         cumulative_variance = np.cumsum(pca_stand.explained_variance_ratio_)
         k = np.argmax(cumulative_variance >= variance_level) + 1
-        
-        # TODO: calculate the actual variance per component and return the value (instead of cumulative variance?)
+
         pca_final = PCA(n_components=k)
         pca_scores= pca_final.fit_transform(df)
         df_pca_scores= pd.DataFrame(pca_scores, columns=[f"PC{int(col)}" for col in range(1,k+1)])  
@@ -102,7 +104,7 @@ class PCAAnalyser:
                 df_mean_pain = df_pc_mean_stand[df_pc_mean_stand['PRMD_ever'] == 1][pc]
                 df_mean_nopain = df_pc_mean_stand[df_pc_mean_stand['PRMD_ever'] == 0][pc]
                 
-                t_stat, p_value = ttest_ind(df_mean_pain, df_mean_nopain, equal_var=False)
+                t_stat, p_value = st.ttest_ind(df_mean_pain, df_mean_nopain, equal_var=False)
                 t_test_result.append([target, axis, pc, t_stat, p_value])
         return t_test_result
        
@@ -119,7 +121,7 @@ class PCAAnalyser:
             pd.DataFrame: DataFrame of t-test results sorted by absolute t-value, 
                         with columns: ['target', 'axis', 'PC', 't_value', 'p_value'].
         """
-        #TODO: calculate and return the group mean and SD (pain/no pain) for each PC
+
         t_test_total = []
         for target, axis in unique_target_axes:
             df_target_axis = df[(df["target"] == target) & (df["axis"] == axis)]
@@ -162,7 +164,7 @@ class PCAAnalyser:
             std_pain = df_pain.std()
             std_nopain = df_nopain.std()
             
-            t_stat, p_value = ttest_ind(df_pain, df_nopain, equal_var=False)
+            t_stat, p_value = st.ttest_ind(df_pain, df_nopain, equal_var=False)
             t_test_result.append([target, axis, pc_id, pc_idx, t_stat, p_value, mean_pain, mean_nopain, std_pain, std_nopain])
         return t_test_result
        
@@ -179,7 +181,7 @@ class PCAAnalyser:
             pd.DataFrame: DataFrame of t-test results sorted by absolute t-value, 
                         with columns: ['target', 'axis', 'PC', 't_value', 'p_value'].
         """
-        #TODO: calculate and return the group mean and SD (pain/no pain) for each PC
+
         unique_target_axes = df[['target', 'axis']].drop_duplicates().values.tolist()
         df_pc_reduced = df[['participant_id', 'PRMD_ever', 'target', 'axis', 'pc_id', 'pc_index', 'pc_score']]
     
@@ -193,6 +195,111 @@ class PCAAnalyser:
         df_t_test_ranked = df_t_test.sort_values(by="t_value", key=lambda x: x.abs(), ascending=False).reset_index(drop=True)
         return df_t_test_ranked
 
+    def check_t_test_assumptions(self, df):
+        """"""
+        #pc_ids = df['pc_id'].drop_duplicates().values.tolist()
+        #for pc_
+
+        df_mean = df.groupby(['target', 'axis', 'pc_index', 'pc_id', 'participant_id', 'PRMD_ever'])['pc_score'].mean().reset_index()
+        #self.kolmogorov_smirnov_test(df_mean)
+        
+        distributions_plotted = True
+        
+        target_axes = df[['target', 'axis', 'pc_index', 'pc_id']].drop_duplicates().values.tolist()
+        pc_distribution_results = []
+        for target, axis, pc_index, pc_id in target_axes:
+            stat_pain, p_pain, stat_nopain, p_nopain = self.shapiro_wilk_test(df_mean, target, axis, pc_index)
+            distribution_info = 'normal_distribution' if p_pain > 0.05 and p_nopain > 0.05 else 'non_normal_distribution'
+            pc_distribution_results.append(PC_Ranked(
+                id = pc_id,
+                measurement_type_id= 1,
+                distribution_info = distribution_info,
+                shap_wilk_w_pain=stat_pain,
+                shap_wilk_w_no_pain=stat_nopain,
+                shap_wilk_p_pain=p_pain,
+                shap_wilk_p_no_pain=p_nopain ))
+            if not distributions_plotted:
+                df_target_axis = df[(df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']        
+                fig = self.plot_distribution(df_target_axis, 'pc_score', target, axis, pc_index, )
+                self.save_distribution_plot(fig, target, axis, pc_index)
+        print("")
+        return pc_distribution_results
+        # 
+        
+    def upload_distribution_info(self, pc_distributions):
+        """"""
+        self.pc_ranked_repo.update_pc_score_distribution_info(pc_distributions)
+        
+    @staticmethod    
+    def plot_distribution(df, column,target, axis, pc_index, kind='hist', bins=10, **kwargs):
+        """
+        Plot the distribution of a DataFrame column.
+
+        Parameters:
+        - df: pandas DataFrame
+        - column: str, column name to plot
+        - kind: 'hist' for histogram, 'kde' for density plot
+        - bins: int, number of bins (used for histogram)
+        - **kwargs: additional keyword arguments for plot customization
+        """
+        fig, ax = plt.subplots()
+        if kind == 'hist':
+            df.plot(kind='hist', bins=bins, edgecolor='black', ax = ax, **kwargs)
+            plt.xlabel(column)
+            plt.ylabel('Frequency')
+            plt.title(f'Histogram of PC Scores: {target}, {axis}, PC {pc_index}')
+        elif kind == 'kde':
+            df.plot(kind='kde', ax = ax, **kwargs)
+            plt.xlabel(column)
+            plt.ylabel('Density')
+            plt.title(f'KDE of PC Scores: {target}, {axis}, PC {pc_index}')
+        else:
+            raise ValueError("kind must be 'hist' or 'kde'")
+        return fig
+    
+    def save_distribution_plot(self, fig, target, axis, pc_index):
+        current_path = Path.cwd()
+        output_path = current_path / "output" / "plots" / "Histograms"
+        self.save_plot(fig, output_path, f"PC-Scores_Histogram_{target}_{axis}_PC_{pc_index}")
+        plt.close()
+    
+    @staticmethod
+    def kolmogorov_smirnov_test(df):
+        target_axes = df[['target', 'axis', 'pc_index']].drop_duplicates().values.tolist()
+        diff_target_axes = 0
+        for target, axis, pc_index in target_axes:
+            df_target_axis = df[(df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
+            #pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
+            #nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
+            statistic, p_value = st.kstest(df_target_axis, 'norm')
+            #statistic, p_value = st.ks2test(pain_group, nopain_group)
+            if p_value <= 0.05:
+                print(f"Kolmogorov-Smirnov: {target}, {axis}, PC {pc_index}: Statistic: {statistic}, p-value: {p_value}")
+                diff_target_axes += 1
+        print(f'Total count different distributions: {diff_target_axes}' )
+            
+    
+    @staticmethod    
+    def shapiro_wilk_test(df, target, axis, pc_index):
+        #pain_group = df[df['PRMD_ever'] == 1]
+        #nopain_group = df[df['PRMD_ever'] == 0]     
+        #target_axes = df[['target', 'axis', 'pc_index']].drop_duplicates().values.tolist()
+        #diff_target_axes_pain = 0
+        #diff_target_axes_nopain = 0
+        #for target, axis, pc_index in target_axes:
+        pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
+        nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
+        stat_pain, p_pain = st.shapiro(pain_group)
+        stat_nopain, p_nopain = st.shapiro(nopain_group)
+        return stat_pain, p_pain, stat_nopain, p_nopain
+        #if p_pain <= 0.05:
+        #    print(f"Shapiro-Wilk Pain: {target}, {axis}, PC {pc_index}: Statistic: {stat_pain}, p-value: {p_pain}")
+        #    diff_target_axes_pain += 1
+        #if p_nopain <= 0.05:
+        #    print(f"Shapiro-Wilk No Pain: {target}, {axis}, PC {pc_index}: Statistic: {stat_nopain}, p-value: {p_nopain}")
+        #    diff_target_axes_nopain += 1
+        #print(f'Total count different distributions: Pain {diff_target_axes_pain} | no Pain {diff_target_axes_nopain}' )
+        
     @staticmethod
     def calculate_mean_waveform_target_axis(df):
         """
@@ -276,7 +383,7 @@ class PCAAnalyser:
         mean_note_waveforms = self.combine_half_strokes_to_full_cycles_mean_note(mean_note_waveforms)
         mean_lookup = {(row['full_stroke'], row['time_point']): row['mean_value']
                    for _, row in mean_note_waveforms.iterrows()}
-        # TODO: check how to iterate over the samples effectively
+        # TODO: check how to iterate over the samples more effectively
 
         for sample_idx in range(0,len(recon_orig)):
             stroke_idx = sample_idx % 11
@@ -757,8 +864,8 @@ class PCAAnalyser:
             ))
         self.pc_scores_repo.insert_multiple_pc_scores(pc_scores)
         
-    def load_pc_data(self, exp_id, device, meas_timepoint):
-        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device, meas_timepoint)
+    def load_pc_data(self, exp_id, device, meas_timepoint, distribution_info = None):
+        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device, meas_timepoint, distribution_info)
         return df
     
     def load_pcs_by_rank(self, exp_id, device, meas_tp, min_rank, max_rank):

@@ -31,16 +31,23 @@ class PCScoresRepository:
 # use these functions to access data from the experiment table, depending on the needs
 # TODO
 
-    def get_pc_scores_by_exp_id_device(self, exp_id, device, meas_timepoint):
+    def get_pc_scores_by_exp_id_device(self, exp_id, device, meas_timepoint, distribution_info = None):
         """
         Returns a Dataframe from the Participants PCs table.
         """
         cursor = self.conn.cursor()
-        query = """
-            SELECT * FROM [Participants PCs]
-            WHERE exp_id = ? AND device = ? AND meas_time_point = ?
-        """
-        cursor.execute(query, (exp_id, device, meas_timepoint))
+        if distribution_info != None:
+            query = """
+                SELECT * FROM [Participants PCs]
+                WHERE exp_id = ? AND device = ? AND meas_time_point = ? AND distribution_info = ?
+            """
+            cursor.execute(query, (exp_id, device, meas_timepoint, distribution_info))
+        else:
+            query = """
+                SELECT * FROM [Participants PCs]
+                WHERE exp_id = ? AND device = ? AND meas_time_point = ?
+            """
+            cursor.execute(query, (exp_id, device, meas_timepoint))
         rows = cursor.fetchall()
         if not rows:
             return None

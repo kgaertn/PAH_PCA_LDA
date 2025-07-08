@@ -106,15 +106,9 @@ class DatapointRepository:
             measurement metadata and participant pain-related fields. Returns None if no data found.
         """
         cursor = self.conn.cursor()
-        query = ""
-        if exp_id == 1 and device == 'emg':
-            query ="""
-                SELECT * FROM [Datapoints MPA Clean EMG]
-            """
-        elif exp_id == 1 and device == 'mocap':
-            query ="""
-                SELECT * FROM [Datapoints MPA Clean MoCap]
-            """
+        query ="""
+            SELECT * FROM [Datapoints MPA Clean] WHERE experiment_id = ? AND device = ?;
+        """
         cursor.execute(query, (exp_id, device))
         rows = cursor.fetchall()
         if not rows:
@@ -137,18 +131,10 @@ class DatapointRepository:
             measurement metadata and participant pain-related fields. Returns None if no data found.
         """
         cursor = self.conn.cursor()
-        query = ""
-        if exp_id == 1 and device == 'emg':
-            query ="""
-                SELECT * FROM [Datapoints MPA Clean EMG]
-                WHERE timepoint = ?
-            """
-        elif exp_id == 1 and device == 'mocap':
-            query ="""
-                SELECT * FROM [Datapoints MPA Clean MoCap]
-                WHERE timepoint = ?
-            """
-        cursor.execute(query, (timepoint,))
+        query ="""
+            SELECT * FROM [Datapoints MPA Clean] WHERE experiment_id = ? AND device = ? AND timepoint = ?;
+        """
+        cursor.execute(query, (exp_id, device, timepoint,))
         rows = cursor.fetchall()
         if not rows:
             return None
@@ -170,19 +156,10 @@ class DatapointRepository:
             measurement metadata and participant pain-related fields. Returns None if no data found.
         """
         cursor = self.conn.cursor()
-        query = ""
-        if exp_id == 1 and device == 'emg':
-            query ="""
-                SELECT * FROM [Datapoints MPA Clean EMG]
-                WHERE timepoint = ? AND target = ?
-            """
-        elif exp_id == 1 and device == 'mocap':
-            query ="""
-                SELECT * FROM [Datapoints MPA Clean MoCap]
-                WHERE timepoint = ? AND target = ?
-            """
-
-        cursor.execute(query, (timepoint, target))
+        query = """
+            SELECT * FROM [Datapoints MPA Clean] WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ?;
+        """
+        cursor.execute(query, (exp_id, device, timepoint, target))
         rows = cursor.fetchall()
         if not rows:
             return None
@@ -205,21 +182,21 @@ class DatapointRepository:
         """
         cursor = self.conn.cursor()
         query = ""
-        if exp_id == 1 and device == 'emg':
+        if device == 'emg':
             query ="""
-                SELECT * FROM [Datapoints MPA Clean EMG]
-                WHERE timepoint = ? AND target = ?
+                SELECT * FROM [Datapoints MPA Clean]
+                WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ?;
             """
-        elif exp_id == 1 and device == 'mocap':
+        elif device == 'mocap':
             query ="""
-                SELECT * FROM [Datapoints MPA Clean MoCap]
-                WHERE timepoint = ? AND target = ? AND axis = ?
+                SELECT * FROM [Datapoints MPA Clean]
+                WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ? AND axis = ?;
                 
             """
         if device == 'emg':
-            cursor.execute(query, (timepoint, target))
+            cursor.execute(query, (exp_id, device, timepoint, target))
         else:
-            cursor.execute(query, (timepoint, target, axis))
+            cursor.execute(query, (exp_id, device, timepoint, target, axis))
         rows = cursor.fetchall()
         if not rows:
             return None
@@ -243,19 +220,19 @@ class DatapointRepository:
         placeholders = ','.join(['?'] * len(participant_ids)) 
         cursor = self.conn.cursor()
         query = ""
-        if exp_id == 1 and device == 'emg':
+        if device == 'emg':
             query =f"""
-                SELECT * FROM [Datapoints MPA Clean EMG]
-                WHERE timepoint = ? AND target = ? AND participant_id IN ({placeholders})
+                SELECT * FROM [Datapoints MPA Clean]
+                WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ? AND participant_id IN ({placeholders})
             """
-            params = (timepoint, target) + participant_ids
-        elif exp_id == 1 and device == 'mocap':
+            params = (exp_id, device, timepoint, target) + participant_ids
+        elif device == 'mocap':
             query =f"""
-                SELECT * FROM [Datapoints MPA Clean MoCap]
-                WHERE timepoint = ? AND target = ? AND axis = ? AND participant_id IN ({placeholders})
+                SELECT * FROM [Datapoints MPA Clean]
+                WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ? AND axis = ? AND participant_id IN ({placeholders})
                 
             """
-            params = (timepoint, target, axis) + participant_ids
+            params = (exp_id, device, timepoint, target, axis) + participant_ids
         #if device == 'emg':
         cursor.execute(query, params)
         rows = cursor.fetchall()

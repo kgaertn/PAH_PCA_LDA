@@ -38,7 +38,7 @@ class MeasurementRepository:
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT DISTINCT target, axis FROM measurement_type
-            WHERE experiment_id = ? AND device = ?
+            WHERE experiment_id = ? AND device = ? AND rotation_sequence != 'carrying_angle'
             ORDER BY target, axis
         """, (exp_id, device))
         return cursor.fetchall() 

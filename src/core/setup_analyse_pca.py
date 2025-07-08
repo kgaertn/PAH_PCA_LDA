@@ -13,7 +13,7 @@ class SetupAnalyserPCA:
         self.pca_analyser = PCAAnalyser() 
         self.setup_uploader = SetupUploader()
     
-    def run_pca_analysis(self,exp_id, measurement_tp, device, scale_data = True, scaler_type = 'standard_scaler'):
+    def run_pca_analysis(self,exp_id, measurement_tp, device, scale_data = True, scaler_type = 'standard_scaler', check_requirements = False):
         existing_target_axes = self.data_processor.get_existing_target_axis_MPA_Clean(device)
         total_pca_info = {}
         for target, axis in existing_target_axes:
@@ -22,16 +22,19 @@ class SetupAnalyserPCA:
             df_sorted, df_sorted_transformed  = self.setup_uploader.load_data_for_pca(device,measurement_tp, target, axis)
             df_transformed = self.setup_uploader.process_data_for_pca(df_sorted)
             df_outliers_removed, count_outliers = self.setup_uploader.check_and_remove_outliers(df_transformed)
-            #self.plot_data_linearity(target, axis, df_outliers_removed)
+            
             df_part, df_pca = df_outliers_removed.iloc[:, :-202], df_outliers_removed.iloc[:, -202:]
             measurement_type_id = int(df_transformed['measurement_type_id'].unique()[0])
-            fig_corr_mat = self.pca_analyser.check_pca_requirements(df_sorted_transformed.iloc[:, -202:], target, axis)
-            current_path = Path.cwd()
-            output_path = current_path / "output" / "plots"
-            output_path = current_path / "output" / "plots" / "Correlation_matrix"
-            self.pca_analyser.save_plot(fig_corr_mat, output_path, f"Original_Data_Correlation_matrix_{target}_{axis}")
-            fig_corr_mat = self.pca_analyser.check_pca_requirements(df_transformed.iloc[:, -202:], target, axis)
-            self.pca_analyser.save_plot(fig_corr_mat, output_path, f"Mean_Subt_Data_Correlation_matrix_{target}_{axis}")
+            if check_requirements:
+                self.plot_data_linearity(target, axis, df_sorted_transformed)
+                
+                fig_corr_mat = self.pca_analyser.check_pca_requirements(df_sorted_transformed.iloc[:, -202:], target, axis)
+                current_path = Path.cwd()
+                output_path = current_path / "output" / "plots"
+                output_path = current_path / "output" / "plots" / "Correlation_matrix"
+                self.pca_analyser.save_plot(fig_corr_mat, output_path, f"Original_Data_Correlation_matrix_{target}_{axis}")
+                fig_corr_mat = self.pca_analyser.check_pca_requirements(df_transformed.iloc[:, -202:], target, axis)
+                self.pca_analyser.save_plot(fig_corr_mat, output_path, f"Mean_Subt_Data_Correlation_matrix_{target}_{axis}")
             if scale_data:
                 df_analysis, scaler_info = self.scale_df(df_pca, scaler_type)
                 scaler = self.pca_analyser.load_specific_scaler(measurement_type_id, scaler_type)
@@ -53,17 +56,13 @@ class SetupAnalyserPCA:
                 }
             })
         return total_pca_info
-            #TODO: return scaler_info, pca_info, pc_sample_scores
-        #self.conduct_and_upload_t_test(exp_id, device, measurement_tp)
-        #print(f"{target} {axis} analysed and saved")
-
     
     def upload_pca_analysis(self, pca_info):
-        for target_axis in pca_info:
-            scaler_id = target_axis['scaler_id']
-            data_scaled = target_axis['data_scaled']
-            pc_info = target_axis['pca_info']
-            sample_scores = target_axis['pc_sample_scores']
+        for target_axis, target_axis_data in pca_info.items():
+            scaler_id = target_axis_data['scaler_id']
+            data_scaled = target_axis_data['data_scaled']
+            pc_info = target_axis_data['pca_info']
+            sample_scores = target_axis_data['pc_sample_scores']
             
             self.upload_pca_analysis_target_axis(pc_info, sample_scores, scaler_id, data_scaled)
     
@@ -90,7 +89,7 @@ class SetupAnalyserPCA:
     def upload_scaler(self, measurement_type_id, scaler_info):
         mean = scaler_info['mean']
         scale = scaler_info['scale']
-        scaler_type = scaler_info['standard_scaler']
+        scaler_type = scaler_info['scaler_type']
         scaler_id = self.pca_analyser.upload_scaler(measurement_type_id, scaler_type, mean, scale)
         return scaler_id
    
@@ -119,18 +118,29 @@ class SetupAnalyserPCA:
         return pca_info, pc_scores
     
     def upload_pca_analysis_target_axis(self, pca_info, pc_sample_scores, scaler_id = None, data_scaled = False):
-        for component in pca_info:
+        pc_sample_keys = list(pc_sample_scores.keys())
+        for index, (_, component) in enumerate(pca_info.items()):
+            component_key = pc_sample_keys[index]
             measurement_type_id = component['measurement_type_id']
             pc_index = component['pc_index']
             loading_vector = component['loading_vector']
             explained_variance = component['explained_variance']
             pc_id = self.pca_analyser.upload_pca(measurement_type_id, pc_index, loading_vector, explained_variance, data_scaled, scaler_id)
-            self.pca_analyser.upload_pc_scores(pc_id, pc_sample_scores)
+            self.pca_analyser.upload_pc_scores(pc_id, pc_sample_scores[component_key])
+    
+    def check_distribution(self, exp_id, device, measurement_tp):
+        pca_df = self.pca_analyser.load_pc_data(exp_id, device, measurement_tp)
+        pc_distribution_results= self.pca_analyser.check_t_test_assumptions(pca_df)     
+        return pc_distribution_results   
     
     def conduct_t_test(self, exp_id, device, measurement_tp):
-        pca_df = self.pca_analyser.load_pc_data(exp_id, device, measurement_tp)
+        pca_df = self.pca_analyser.load_pc_data(exp_id, device, measurement_tp, 'normal_distribution')
+        
         t_test_results = self.pca_analyser.rank_pcs(pca_df)
         return t_test_results
+        
+    def upload_distribution(self, distribution_info):
+        self.pca_analyser.upload_distribution_info(distribution_info)
         
     def upload_t_test(self, t_test_results):
         self.pca_analyser.upload_t_test_results(t_test_results)

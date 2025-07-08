@@ -5,8 +5,8 @@ def adjusted_db_setup():
     add_columns_if_missing('datapoint', new_columns = {'sample_id': 'INTEGER'})
     create_adjusted_view()
     create_datapoints_MPA_view()
-    create_datapoints_MPA_device_view('MoCap', 'mocap')
-    create_datapoints_MPA_device_view('EMG', 'emg')
+    #create_datapoints_MPA_device_view('MoCap', 'mocap')
+    #create_datapoints_MPA_device_view('EMG', 'emg')
     create_PCA_View()
     fill_measurement_type_table()
     add_measurement_type_id_to_measurement()
@@ -51,7 +51,8 @@ def create_tables():
             device TEXT,
 			meas_time_point TEXT,
 			target TEXT,
-            axis TEXT,          
+            axis TEXT,  
+            rotation_sequence TEXT,        
 			FOREIGN KEY (experiment_id) REFERENCES experiment(id)
             UNIQUE (experiment_id, device, meas_time_point, target, axis)
         );
@@ -119,6 +120,11 @@ def create_tables():
             p_value REAL,
             data_scaled INTEGER,
             pca_info TEXT,
+            distribution_info TEXT,
+            shap_wilk_w_pain REAL,
+            shap_wilk_w_no_pain REAL,
+            shap_wilk_p_pain REAL,
+            shap_wilk_p_no_pain REAL,
             FOREIGN KEY (measurement_type_id) REFERENCES measurement_type(id)
             UNIQUE (measurement_type_id, scaler_id, pc_index, data_scaled)
         )
@@ -228,29 +234,7 @@ def create_datapoints_MPA_view():
                 p.PRMD_shoulder_neck_left, p.PRMD_upper_arm_right, 
                 p.PRMD_upper_arm_left, p.PRMD_ever,
                 m.id AS measurement_id, m.measurement_type_id, m.timepoint, m.device,
-                m.target, m.axis, m.unit,
-                d.id AS dp_id, d.sample_id, d.bow_stroke, d.up_down,
-                d.key, d.time_point AS dp_time_point, d.value
-
-            FROM experiment e
-            JOIN participant p ON p.experiment_id = e.id
-            JOIN measurement m ON m.participant_id = p.id
-            JOIN datapoint_adjusted d ON d.measurement_id = m.id;
-    """)
-
-def create_datapoints_MPA_device_view(device_table_name:str, device:str):
-    #TODO
-    conn = get_connection()
-    cursor = conn.cursor()
-    cursor.execute(f"""
-        CREATE VIEW IF NOT EXISTS "Datapoints MPA Clean {device_table_name}" AS
-            SELECT
-                e.id AS experiment_id, e.name,
-                p.id AS participant_id, p.participant_id AS ext_participant_id, p.instrument, p.PRMD_shoulder_neck_right, 
-                p.PRMD_shoulder_neck_left, p.PRMD_upper_arm_right, 
-                p.PRMD_upper_arm_left, p.PRMD_ever,
-                m.id AS measurement_id, m.measurement_type_id, m.timepoint, m.device,
-                m.target, m.axis, m.unit,
+                m.target, m.axis, m.unit, mt.rotation_sequence,
                 d.id AS dp_id, d.sample_id, d.bow_stroke, d.up_down,
                 d.key, d.time_point AS dp_time_point, d.value
 
@@ -258,8 +242,32 @@ def create_datapoints_MPA_device_view(device_table_name:str, device:str):
             JOIN participant p ON p.experiment_id = e.id
             JOIN measurement m ON m.participant_id = p.id
             JOIN datapoint_adjusted d ON d.measurement_id = m.id
-            WHERE m.device = "{device}";
+            JOIN measurement_type mt ON m.measurement_type_id = mt.id
+            WHERE mt.rotation_sequence != 'carrying_angle';
     """)
+
+#def create_datapoints_MPA_device_view(device_table_name:str, device:str):
+#    #TODO
+#    conn = get_connection()
+#    cursor = conn.cursor()
+#    cursor.execute(f"""
+#        CREATE VIEW IF NOT EXISTS "Datapoints MPA Clean {device_table_name}" AS
+#            SELECT
+#                e.id AS experiment_id, e.name,
+#                p.id AS participant_id, p.participant_id AS ext_participant_id, p.instrument, p.PRMD_shoulder_neck_right, 
+#                p.PRMD_shoulder_neck_left, p.PRMD_upper_arm_right, 
+#                p.PRMD_upper_arm_left, p.PRMD_ever,
+#                m.id AS measurement_id, m.measurement_type_id, m.timepoint, m.device,
+#                m.target, m.axis, m.unit,
+#                d.id AS dp_id, d.sample_id, d.bow_stroke, d.up_down,
+#                d.key, d.time_point AS dp_time_point, d.value
+#
+#            FROM experiment e
+#            JOIN participant p ON p.experiment_id = e.id
+#            JOIN measurement m ON m.participant_id = p.id
+#            JOIN datapoint_adjusted d ON d.measurement_id = m.id
+#            WHERE m.device = "{device}";
+#    """)
     
     
 def create_PCA_View():
@@ -267,12 +275,13 @@ def create_PCA_View():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-		CREATE VIEW IF NOT EXISTS "Participants PCs" AS
+        CREATE VIEW IF NOT EXISTS "Participants PCs" AS
 			SELECT
                e.id AS exp_id, p.id AS participant_id, p.participant_id AS ext_participant_id, p.PRMD_shoulder_neck_left, 
 			   p.PRMD_shoulder_neck_right, p.PRMD_ever, m.device, mt.id AS meas_type_id, m.timepoint AS meas_time_point, m.target, m.axis, 
 			   pcr.id AS pc_id, pcr.pc_index, pcr.rank, pcr.loading_vector, pcr.explained_variance, 
-			   pcr.group_mean_pain, pcr.group_mean_no_pain, pcr.t_value, pcr.p_value, pcr.data_scaled, 
+			   pcr.group_mean_pain, pcr.group_mean_no_pain, pcr.group_std_pain, pcr.group_std_no_pain, pcr.t_value, pcr.p_value, pcr.data_scaled, 
+                pcr.distribution_info, pcr.shap_wilk_w_pain, pcr.shap_wilk_w_no_pain, pcr.shap_wilk_p_pain, pcr.shap_wilk_p_no_pain, 
 			   s.id, pcs.pc_score
 
             FROM experiment e
@@ -281,7 +290,8 @@ def create_PCA_View():
 			JOIN measurement_type mt ON m.measurement_type_id = mt.id
             JOIN pcs_ranked pcr ON mt.id = pcr.measurement_type_id
 			JOIN sample s ON m.id = s.measurement_id
-            JOIN pc_scores pcs ON s.id = pcs.sample_id AND pcr.id = pcs.pc_id;
+            JOIN pc_scores pcs ON s.id = pcs.sample_id AND pcr.id = pcs.pc_id
+            WHERE mt.rotation_sequence != 'carrying_angle';
     """)
 
 def fill_measurement_type_table():
@@ -321,6 +331,57 @@ def add_measurement_type_id_to_measurement():
     """)
     conn.commit()
         
+
+def add_rotation_sequuence():
+        """UPDATE measurement_type SET rotation_sequence = CASE
+    WHEN target = 'left elbow joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'left gh joint angle' AND axis = 'X' THEN 'abduction'
+	WHEN target = 'left gh joint angle' AND axis = 'Y' THEN 'internal_rotation'
+    WHEN target = 'left gh joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'left ht joint angle' AND axis = 'X' THEN 'abduction'
+    WHEN target = 'left ht joint angle' AND axis = 'Y' THEN 'internal_rotation'
+	WHEN target = 'left ht joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'left humeroulnar joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'left radioulnar joint angle' AND axis = 'Y' THEN 'pronation'
+	WHEN target = 'left st joint angle' AND axis = 'X' THEN 'upward_rotation'
+	WHEN target = 'left st joint angle' AND axis = 'Y' THEN 'protraction'
+	WHEN target = 'left st joint angle' AND axis = 'Z' THEN 'posterior_tilt'
+	WHEN target = 'left wrist joint angle' AND axis = 'X' THEN 'radial_abduction'
+	WHEN target = 'left wrist joint angle' AND axis = 'Y' THEN 'carrying_angle'
+	WHEN target = 'left wrist joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'neck joint angle' AND axis = 'X' THEN 'lateral_flexion'
+	WHEN target = 'neck joint angle' AND axis = 'Y' THEN 'axial_rotation'
+	WHEN target = 'neck joint angle' AND axis = 'Z' THEN 'flexion'
+    WHEN target = 'right elbow joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'right gh joint angle' AND axis = 'X' THEN 'abduction'
+	WHEN target = 'right gh joint angle' AND axis = 'Y' THEN 'internal_rotation'
+    WHEN target = 'right gh joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'right ht joint angle' AND axis = 'X' THEN 'abduction'
+    WHEN target = 'right ht joint angle' AND axis = 'Y' THEN 'internal_rotation'
+	WHEN target = 'right ht joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'right humeroulnar joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'right radioulnar joint angle' AND axis = 'Y' THEN 'pronation'
+	WHEN target = 'right st joint angle' AND axis = 'X' THEN 'upward_rotation'
+	WHEN target = 'right st joint angle' AND axis = 'Y' THEN 'protraction'
+	WHEN target = 'right st joint angle' AND axis = 'Z' THEN 'posterior_tilt'
+	WHEN target = 'right wrist joint angle' AND axis = 'X' THEN 'radial_abduction'
+	WHEN target = 'right wrist joint angle' AND axis = 'Y' THEN 'carrying_angle'
+	WHEN target = 'right wrist joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'sp1 pelvis joint angle' AND axis = 'X' THEN 'lateral_flexion'
+	WHEN target = 'sp1 pelvis joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'sp2 sp1 joint angle' AND axis = 'X' THEN 'lateral_flexion'
+	WHEN target = 'sp2 sp1 joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'sp3 sp2 joint angle' AND axis = 'X' THEN 'lateral_flexion'
+	WHEN target = 'sp3 sp2 joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'sp4 sp3 joint angle' AND axis = 'X' THEN 'lateral_flexion'
+	WHEN target = 'sp4 sp3 joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'sp5 sp4 joint angle' AND axis = 'X' THEN 'lateral_flexion'
+	WHEN target = 'sp5 sp4 joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'thx pel joint angle' AND axis = 'X' THEN 'lateral_flexion'
+	WHEN target = 'thx pel joint angle' AND axis = 'Y' THEN 'axial_rotation'
+	WHEN target = 'thx pel joint angle' AND axis = 'Z' THEN 'flexion'
+    ELSE rotation_sequence 
+END;"""
 
 if __name__ == "__main__":
     create_tables()

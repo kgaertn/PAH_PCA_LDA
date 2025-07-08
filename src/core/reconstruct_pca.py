@@ -49,6 +49,6 @@ class ReconstructerPCA:
             self.pca_analyser.save_plot(fig, output_path, f"{measurement_tp}_Scaled_Orig_Rank_{rank}_{target}_{axis}_{pc_name}")
             plt.close()
             fig, axs = self.pca_analyser.plot_PCA_reconstruction_per_group(component_reconstruction_data, title_reconstruction, title_loading_vector)
-            self.pca_analyser.save_plot(fig, output_path, f"Per_group_{measurement_tp}_Scaled_Orig_Rank_{rank}_{target}_{axis}_{pc_name}")
+            self.pca_analyser.save_plot(fig, output_path, f"{measurement_tp}_per_group_Scaled_Orig_Rank_{rank}_{target}_{axis}_{pc_name}")
             plt.close()
             

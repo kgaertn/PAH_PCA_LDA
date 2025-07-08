@@ -47,6 +47,26 @@ class PCRankedRepository:
             WHERE id = ?
         """, [(pc.rank, pc.group_mean_pain, pc.group_mean_no_pain, pc.group_std_pain, pc.group_std_no_pain, pc.t_value, pc.p_value, pc.id) for pc in t_test_results])
         self.conn.commit()
+    
+    def update_pc_score_distribution_info(self, pc_distributions: list[PC_Ranked]):
+        """
+        Inserts a new pc into the database.
+
+        Args:
+            scaler (Scaler): The scaler object containing X.
+
+        Returns:
+            int: The database ID of the newly inserted sample.
+        """
+        cursor = self.conn.cursor()
+        cursor.executemany("""
+            UPDATE pcs_ranked
+            SET distribution_info = ?, shap_wilk_w_pain = ?, shap_wilk_w_no_pain = ?, 
+            shap_wilk_p_pain = ?, shap_wilk_p_no_pain = ?
+            WHERE id = ?
+        """, [(pc.distribution_info, pc.shap_wilk_w_pain, pc.shap_wilk_w_no_pain, pc.shap_wilk_p_pain, pc.shap_wilk_p_no_pain, pc.id) for pc in pc_distributions])
+        self.conn.commit()
+    
         #return cursor.lastrowid
 
 # region Getter

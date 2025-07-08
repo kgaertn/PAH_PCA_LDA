@@ -19,6 +19,11 @@ class PC_Ranked:
     t_value: Optional[float] = None
     p_value: Optional[float] = None
     pca_info: Optional[str] = None
+    distribution_info: Optional[str] = None
+    shap_wilk_w_pain: Optional[float] = None
+    shap_wilk_w_no_pain: Optional[float] = None
+    shap_wilk_p_pain: Optional[float] = None
+    shap_wilk_p_no_pain: Optional[float] = None
 
     def loading_vector_to_json(self) -> str:
         return json.dumps(self.loading_vector)

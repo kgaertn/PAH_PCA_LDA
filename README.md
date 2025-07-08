@@ -5,7 +5,7 @@
 ### ├── data/                           # database location
 ### ├── src/
 ### │   ├── main.py     
-### │   ├── processing/                # Data processing Layer (These classes the data (pre-)processing)
+### │   ├── data_processing/                # Data processing Layer (These classes the data (pre-)processing)
 ### │   │   └── data_preprocess.py
 ### │   │   └── pca_analysis.py
 ### │   │   └── lda_analysis.py              
