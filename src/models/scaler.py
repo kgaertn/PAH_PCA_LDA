@@ -14,7 +14,7 @@ class Scaler:
         return json.dumps(self.mean)
         
     def scale_to_json(self) -> str:
-        return json.dumps(self.scale)  # <-- Hier war der Fehler
+        return json.dumps(self.scale)
     
     @staticmethod
     def list_from_json(json_str: str) -> List[float]:
