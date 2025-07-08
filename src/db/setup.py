@@ -5,8 +5,6 @@ def adjusted_db_setup():
     add_columns_if_missing('datapoint', new_columns = {'sample_id': 'INTEGER'})
     create_adjusted_view()
     create_datapoints_MPA_view()
-    #create_datapoints_MPA_device_view('MoCap', 'mocap')
-    #create_datapoints_MPA_device_view('EMG', 'emg')
     create_PCA_View()
     fill_measurement_type_table()
     add_measurement_type_id_to_measurement()

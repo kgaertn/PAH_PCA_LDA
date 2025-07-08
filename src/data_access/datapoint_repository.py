@@ -42,7 +42,7 @@ class DatapointRepository:
         cursor = self.conn.cursor()
         cursor.executemany("""
         INSERT INTO datapoint (measurement_id, bow_stroke, up_down, key, time_point, value)
-        VALUES (?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?)
         """, [(dp.measurement_id, dp.bow_stroke, dp.up_down, dp.key, dp.time_point, dp.value) for dp in datapoints])
         self.conn.commit()
         

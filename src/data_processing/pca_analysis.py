@@ -15,7 +15,7 @@ from pathlib import Path
 
 from data_processing.data_preprocess import DataProcessor
 from data_access.scaler_repo import ScalerRepository
-from data_access.pc_ranked_repo import PCRankedRepository
+from data_access.pc_ranked_repository import PCRankedRepository
 from data_access.pc_scores_repository import PCScoresRepository
 from models.scaler import Scaler
 from models.pc_ranked import PC_Ranked

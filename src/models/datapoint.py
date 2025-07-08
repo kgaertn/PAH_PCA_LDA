@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 @dataclass
 class Datapoint:
-    id: int
+    id: int | str
     measurement_id: int
     bow_stroke: int
     up_down: int

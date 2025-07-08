@@ -25,7 +25,7 @@ class ParticipantRepository:
         cursor.execute("""
             INSERT INTO participant (experiment_id, participant_id)
             VALUES (?, ?)
-        """, (participant.ext_experiment_id, participant.participant_id))
+        """, (participant.experiment_id, participant.participant_id))
         self.conn.commit()
         return cursor.lastrowid
 
