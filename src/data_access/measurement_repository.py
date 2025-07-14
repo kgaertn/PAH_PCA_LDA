@@ -34,13 +34,13 @@ class MeasurementRepository:
 
 # region Getter
 # use these functions to access data from the measurement table, depending on the needs
-    def get_existing_measurement_target_axis_by_device(self, exp_id: int, device: str):
+    def get_existing_measurement_target_axis_by_device(self, exp_id: int, device: str, meas_time_point: str):
         cursor = self.conn.cursor()
         cursor.execute("""
             SELECT DISTINCT target, axis FROM measurement_type
-            WHERE experiment_id = ? AND device = ? AND rotation_sequence != 'carrying_angle'
+            WHERE experiment_id = ? AND device = ? AND meas_time_point = ? AND rotation_sequence != 'carrying_angle'
             ORDER BY target, axis
-        """, (exp_id, device))
+        """, (exp_id, device, meas_time_point))
         return cursor.fetchall() 
     
     def get_existing_measurement_ids(self):

@@ -285,8 +285,9 @@ class FormatPainMPAParser:
             #subject_id = 'P00' + str(row["Probanden_ID"])
             participant_ext_id = f"mpa_pain_{subject_id}"
             participants.append(Participant(
-                external_id=participant_ext_id, participant_id=subject_id,
-                ext_experiment_id='mpa_pain', instrument = row['Erstes_Instrument'], 
+                id=participant_ext_id, 
+                participant_id=subject_id,
+                experiment_id='mpa_pain', instrument = row['Erstes_Instrument'], 
                 PRMD_shoulder_neck_right = row['PRMD_Schulter_Nacken_rechts'], 
                 PRMD_shoulder_neck_left = row['PRMD_Schulter_Nacken_links'], 
                 PRMD_upper_arm_right = row['PRMD_Oberarm_rechts'], PRMD_upper_arm_left = row['PRMD_Oberarm_links'], 

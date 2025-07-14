@@ -83,7 +83,7 @@ class DatapointRepository:
         query = ""
         if exp_id == 1:
             query = """
-                SELECT * FROM [Datapoints MPA Clean]
+                SELECT * FROM [Complete Data]
             """
         cursor.execute(query)
         rows = cursor.fetchall()
@@ -107,7 +107,7 @@ class DatapointRepository:
         """
         cursor = self.conn.cursor()
         query ="""
-            SELECT * FROM [Datapoints MPA Clean] WHERE experiment_id = ? AND device = ?;
+            SELECT * FROM [Complete Data] WHERE experiment_id = ? AND device = ?;
         """
         cursor.execute(query, (exp_id, device))
         rows = cursor.fetchall()
@@ -132,7 +132,7 @@ class DatapointRepository:
         """
         cursor = self.conn.cursor()
         query ="""
-            SELECT * FROM [Datapoints MPA Clean] WHERE experiment_id = ? AND device = ? AND timepoint = ?;
+            SELECT * FROM [Complete Data] WHERE experiment_id = ? AND device = ? AND timepoint = ?;
         """
         cursor.execute(query, (exp_id, device, timepoint,))
         rows = cursor.fetchall()
@@ -157,7 +157,7 @@ class DatapointRepository:
         """
         cursor = self.conn.cursor()
         query = """
-            SELECT * FROM [Datapoints MPA Clean] WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ?;
+            SELECT * FROM [Complete Data] WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ?;
         """
         cursor.execute(query, (exp_id, device, timepoint, target))
         rows = cursor.fetchall()
@@ -184,12 +184,12 @@ class DatapointRepository:
         query = ""
         if device == 'emg':
             query ="""
-                SELECT * FROM [Datapoints MPA Clean]
+                SELECT * FROM [Complete Data]
                 WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ?;
             """
         elif device == 'mocap':
             query ="""
-                SELECT * FROM [Datapoints MPA Clean]
+                SELECT * FROM [Complete Data]
                 WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ? AND axis = ?;
                 
             """
@@ -222,13 +222,13 @@ class DatapointRepository:
         query = ""
         if device == 'emg':
             query =f"""
-                SELECT * FROM [Datapoints MPA Clean]
+                SELECT * FROM [Complete Data]
                 WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ? AND participant_id IN ({placeholders})
             """
             params = (exp_id, device, timepoint, target) + participant_ids
         elif device == 'mocap':
             query =f"""
-                SELECT * FROM [Datapoints MPA Clean]
+                SELECT * FROM [Complete Data]
                 WHERE experiment_id = ? AND device = ? AND timepoint = ? AND target = ? AND axis = ? AND participant_id IN ({placeholders})
                 
             """

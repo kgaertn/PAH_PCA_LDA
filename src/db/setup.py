@@ -6,9 +6,11 @@ def adjusted_db_setup():
     create_adjusted_view()
     create_datapoints_MPA_view()
     create_PCA_View()
+
+def add_measurement_type_info():
     fill_measurement_type_table()
-    add_measurement_type_id_to_measurement()
-        
+    add_measurement_type_id_to_measurement()    
+    add_rotation_sequuence()    
 
 def create_tables():
     conn = get_connection()
@@ -41,7 +43,23 @@ def create_tables():
             FOREIGN KEY (experiment_id) REFERENCES experiment(id)
         )
     """)
-    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pain_groups (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pain_type TEXT UNIQUE,
+            participant_id TEXT,
+            age INTEGER,
+            height_cm REAL,
+            weight_kg REAL,
+            instrument TEXT,
+            PRMD_shoulder_neck_right INTEGER,
+            PRMD_shoulder_neck_left INTEGER,
+            PRMD_upper_arm_right INTEGER,
+            PRMD_upper_arm_left INTEGER,
+            PRMD_ever INTEGER,
+            FOREIGN KEY (experiment_id) REFERENCES experiment(id)
+        )
+    """)    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS measurement_type (
             id INTEGER PRIMARY KEY AUTOINCREMENT,  
@@ -105,7 +123,10 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS pcs_ranked (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             measurement_type_id INTEGER,
+            pain_group_id INTEGER,
             scaler_id INTEGER NULL,
+            rotation_id INTEGER,
+            parent_id INTEGER,
             pc_index INTEGER,
             loading_vector TEXT,
             rank INTEGER,
@@ -123,8 +144,10 @@ def create_tables():
             shap_wilk_w_no_pain REAL,
             shap_wilk_p_pain REAL,
             shap_wilk_p_no_pain REAL,
+            FOREIGN KEY (pain_group_id) REFERENCES pain_group(id)
             FOREIGN KEY (measurement_type_id) REFERENCES measurement_type(id)
-            UNIQUE (measurement_type_id, scaler_id, pc_index, data_scaled)
+            FOREIGN KEY (parent_id) REFERENCES pcs_ranked(id)
+            UNIQUE (measurement_type_id, scaler_id, rotation_id, parent_id, pc_index, data_scaled)
         )
     """)
     
@@ -143,9 +166,9 @@ def create_tables():
     # Add scaler table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS scaler (
-            scaler_id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             measurement_type_id INTEGER,
-            scaler_type VARCHAR(64),
+            scaler_type TEXT,
             mean TEXT,
             scale TEXT,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -153,8 +176,34 @@ def create_tables():
             UNIQUE (measurement_type_id, scaler_type)
         );
     """)
-    
-    
+
+    # Add pca rotation table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pca_rotation (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            rotation_type TEXT UNIQUE
+        );
+    """)  
+      
+    # Add pain_group table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pain_group (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            pain_group TEXT UNIQUE NOT NULL
+        );
+    """)   
+     
+    # Add pain_group table
+    cursor.execute("""
+        CREATE TABLE participant_pain_group (
+            participant_id INTEGER NOT NULL,
+            pain_group_id INTEGER NOT NULL,
+            FOREIGN KEY (participant_id) REFERENCES participant(id),
+            FOREIGN KEY (pain_group_id) REFERENCES pain_group(id),
+            PRIMARY KEY (participant_id, pain_group_id)
+        );
+    """)    
+            
     # Add index on measurement_id in datapoint
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_datapoint_measurement_id
@@ -225,7 +274,7 @@ def create_datapoints_MPA_view():
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        CREATE VIEW IF NOT EXISTS "Datapoints MPA Clean" AS
+        CREATE VIEW IF NOT EXISTS "Complete Data" AS
             SELECT
                 e.id AS experiment_id, e.name,
                 p.id AS participant_id, p.participant_id AS ext_participant_id, p.instrument, p.PRMD_shoulder_neck_right, 
@@ -278,15 +327,16 @@ def create_PCA_View():
                e.id AS exp_id, p.id AS participant_id, p.participant_id AS ext_participant_id, p.PRMD_shoulder_neck_left, 
 			   p.PRMD_shoulder_neck_right, p.PRMD_ever, m.device, mt.id AS meas_type_id, m.timepoint AS meas_time_point, m.target, m.axis, 
 			   pcr.id AS pc_id, pcr.pc_index, pcr.rank, pcr.loading_vector, pcr.explained_variance, 
-			   pcr.group_mean_pain, pcr.group_mean_no_pain, pcr.group_std_pain, pcr.group_std_no_pain, pcr.t_value, pcr.p_value, pcr.data_scaled, 
+			   pcr.group_mean_pain, pcr.group_mean_no_pain, pcr.group_std_pain, pcr.group_std_no_pain, pcr.t_value, pcr.p_value, pcr.data_scaled, rot.rotation_type,
                 pcr.distribution_info, pcr.shap_wilk_w_pain, pcr.shap_wilk_w_no_pain, pcr.shap_wilk_p_pain, pcr.shap_wilk_p_no_pain, 
-			   s.id, pcs.pc_score
+			   s.id AS sample_id, pcs.pc_score
 
             FROM experiment e
 			JOIN participant p ON p.experiment_id = e.id
             JOIN measurement m ON m.participant_id = p.id
 			JOIN measurement_type mt ON m.measurement_type_id = mt.id
             JOIN pcs_ranked pcr ON mt.id = pcr.measurement_type_id
+            JOIN pca_rotation AS rot ON mt.id = rot.measurement_type_id
 			JOIN sample s ON m.id = s.measurement_id
             JOIN pc_scores pcs ON s.id = pcs.sample_id AND pcr.id = pcs.pc_id
             WHERE mt.rotation_sequence != 'carrying_angle';
@@ -331,7 +381,9 @@ def add_measurement_type_id_to_measurement():
         
 
 def add_rotation_sequuence():
-        """UPDATE measurement_type SET rotation_sequence = CASE
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute(f"""UPDATE measurement_type SET rotation_sequence = CASE
     WHEN target = 'left elbow joint angle' AND axis = 'Z' THEN 'flexion'
 	WHEN target = 'left gh joint angle' AND axis = 'X' THEN 'abduction'
 	WHEN target = 'left gh joint angle' AND axis = 'Y' THEN 'internal_rotation'
@@ -379,7 +431,11 @@ def add_rotation_sequuence():
 	WHEN target = 'thx pel joint angle' AND axis = 'Y' THEN 'axial_rotation'
 	WHEN target = 'thx pel joint angle' AND axis = 'Z' THEN 'flexion'
     ELSE rotation_sequence 
-END;"""
+END;""")
+    conn.commit()
+    
+
+        
 
 if __name__ == "__main__":
     create_tables()

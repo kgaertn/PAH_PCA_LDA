@@ -4,9 +4,10 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent / "src"))
 from core.uploader_service import UploaderService
+from analysis.data_processing.data_preprocess import DataProcessor
 from data_access.experiment_repository import ExperimentRepository
 from db.setup import adjusted_db_setup
-
+from db.setup import add_measurement_type_info
 
 
 
@@ -42,6 +43,10 @@ def main():
         #uploader.upload(list(clean_mpa_folder_emg.glob('*')))
         
     uploader.upload_mpa_pain(str(mpa_pain_data))
+    add_measurement_type_info()
+    
+    data_processor = DataProcessor()
+    data_processor.create_samples()
 
 if __name__ == "__main__":
     main()

@@ -117,7 +117,7 @@
  ├── pc_index                    # (int) this is the component index of the pc (e.g. 1 for PC1, 2 for PC2, etc.)
  ├── loading_vector              # (str) this is the list of values for the loading vector, in json string format (can be transverted back into a list[float] 
                                  # using the class function of pc_ranked.py)
-### ├── rank                        # (int) the rank assigned to the component by the t-test (sorted by absolute t-value)
+ ├── rank                        # (int) the rank assigned to the component by the t-test (sorted by absolute t-value)
  ├── explained_variance          # (float) the explained variance for this component
  ├── group_mean_pain             # (float) calculated group mean for the pc scores of this component for pain participants 
  ├── group_mean_no_pain          # (float) calculated group mean for the pc scores of this component for no pain participants 

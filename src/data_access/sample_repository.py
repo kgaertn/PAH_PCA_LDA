@@ -24,7 +24,7 @@ class SampleRepository:
         cursor.execute("""
             INSERT OR IGNORE INTO sample (measurement_id, bow_stroke_start, bow_stroke_end)
             VALUES (?, ?, ?)
-        """, (sample.measurement_id, sample.bow_stroke_start, sample.bow_stroke_end))
+        """, (sample.measurement_id, int(sample.bow_stroke_start), int(sample.bow_stroke_end)))
         self.conn.commit()
         return cursor.lastrowid
 

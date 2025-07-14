@@ -31,7 +31,7 @@ class PCScoresRepository:
 # use these functions to access data from the experiment table, depending on the needs
 # TODO
 
-    def get_pc_scores_by_exp_id_device(self, exp_id, device, meas_timepoint, distribution_info = None):
+    def get_pc_scores_by_exp_id_device(self, exp_id, device, meas_timepoint, distribution_info = None, rotation_type = None):
         """
         Returns a Dataframe from the Participants PCs table.
         """

@@ -1,6 +1,8 @@
-from data_processing.data_preprocess import DataProcessor
-from data_processing.pca_analysis import PCAAnalyser
-from core.setup_and_upload import SetupUploader
+from analysis.data_processing.data_preprocess import DataProcessor
+from analysis.data_analysis.pca_analysis import PCAAnalyser
+from analysis.data_processing.data_loading import DataLoader
+from analysis.data_processing.assumptions_testing import AssumptionsTester
+from depricated.setup_and_upload import SetupUploader
 
 from pathlib import Path
 
@@ -11,10 +13,12 @@ class SetupAnalyserPCA:
         """
         self.data_processor = DataProcessor()
         self.pca_analyser = PCAAnalyser() 
+        self.data_loader = DataLoader()
         self.setup_uploader = SetupUploader()
+        self.assumptions_testing = AssumptionsTester()
     
     def run_pca_analysis(self,exp_id, measurement_tp, device, scale_data = True, scaler_type = 'standard_scaler', check_requirements = False):
-        existing_target_axes = self.data_processor.get_existing_target_axis_MPA_Clean(device)
+        existing_target_axes = self.data_loader.get_existing_target_axis_exp(device, exp_id)
         total_pca_info = {}
         for target, axis in existing_target_axes:
             if(target, axis)== ('left radioulnar joint angle', 'Y'):
@@ -37,7 +41,7 @@ class SetupAnalyserPCA:
                 self.pca_analyser.save_plot(fig_corr_mat, output_path, f"Mean_Subt_Data_Correlation_matrix_{target}_{axis}")
             if scale_data:
                 df_analysis, scaler_info = self.scale_df(df_pca, scaler_type)
-                scaler = self.pca_analyser.load_specific_scaler(measurement_type_id, scaler_type)
+                scaler = self.data_loader.load_specific_scaler(measurement_type_id, scaler_type)
                 if scaler:
                     scaler_id = scaler.id
                 else: 
@@ -90,7 +94,7 @@ class SetupAnalyserPCA:
         mean = scaler_info['mean']
         scale = scaler_info['scale']
         scaler_type = scaler_info['scaler_type']
-        scaler_id = self.pca_analyser.upload_scaler(measurement_type_id, scaler_type, mean, scale)
+        scaler_id = self.data_loader.upload_scaler(measurement_type_id, scaler_type, mean, scale)
         return scaler_id
    
     def conduct_pca_analysis(self, df, df_part, measurement_type_id, data_scaled = True, scaler_id = None):     
@@ -125,22 +129,22 @@ class SetupAnalyserPCA:
             pc_index = component['pc_index']
             loading_vector = component['loading_vector']
             explained_variance = component['explained_variance']
-            pc_id = self.pca_analyser.upload_pca(measurement_type_id, pc_index, loading_vector, explained_variance, data_scaled, scaler_id)
-            self.pca_analyser.upload_pc_scores(pc_id, pc_sample_scores[component_key])
+            pc_id = self.data_loader.upload_pca(measurement_type_id, pc_index, loading_vector, explained_variance, data_scaled, scaler_id)
+            self.data_loader.upload_pc_scores(pc_id, pc_sample_scores[component_key])
     
-    def check_distribution(self, exp_id, device, measurement_tp):
-        pca_df = self.pca_analyser.load_pc_data(exp_id, device, measurement_tp)
-        pc_distribution_results= self.pca_analyser.check_t_test_assumptions(pca_df)     
+    def check_distribution(self, exp_id, device, measurement_tp, distributions_plotted = True):
+        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp)
+        pc_distribution_results= self.assumptions_testing.check_t_test_assumptions(pca_df, distributions_plotted)     
         return pc_distribution_results   
     
     def conduct_t_test(self, exp_id, device, measurement_tp):
-        pca_df = self.pca_analyser.load_pc_data(exp_id, device, measurement_tp, 'normal_distribution')
+        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, 'normal_distribution',)
         
         t_test_results = self.pca_analyser.rank_pcs(pca_df)
         return t_test_results
         
     def upload_distribution(self, distribution_info):
-        self.pca_analyser.upload_distribution_info(distribution_info)
+        self.data_loader.upload_distribution_info(distribution_info)
         
     def upload_t_test(self, t_test_results):
-        self.pca_analyser.upload_t_test_results(t_test_results)
+        self.data_loader.upload_t_test_results(t_test_results)
