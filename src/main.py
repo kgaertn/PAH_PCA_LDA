@@ -6,8 +6,8 @@ from core.run_general_analysis import GeneralAnalysisRunner
 def main():
     pca_analysis_completed = False
     pca_uploads_completed = []
-    pca_uploads_completed = [(1,'pre','mocap')]
-    pca_uploads_completed = [(1,'pre','mocap'), (1,'post','mocap')]
+    #pca_uploads_completed = [(1,'pre','mocap')]
+    #pca_uploads_completed = [(1,'pre','mocap'), (1,'post','mocap')]
     
     exp_id = 1
     measurement_tp = 'post'
@@ -17,12 +17,12 @@ def main():
     general_analysis_runner = GeneralAnalysisRunner()
     #setup_loader_pca = SetupAnalyserPCA()
     #pc_reconstructer = ReconstructerPCA()
-    pain_group = "shoulder_neck_healthy"
+    pain_groups = ["healthy", "shoulder_neck"]
 
     #general_analysis_runner.create_plots_mean_std(device, exp_id, measurement_tp)
     
     if ((exp_id, measurement_tp, device) not in pca_uploads_completed):
-        pca_results = pca_runner.run_pca_analysis(exp_id, measurement_tp, device, pain_group, check_requirements=False)
+        pca_results = pca_runner.run_pca_analysis(exp_id, measurement_tp, device, pain_groups, check_requirements=False)
         pca_runner.upload_pca_analysis(pca_results)        
         pc_distribution_results = pca_runner.check_distribution(exp_id, device, measurement_tp, distributions_plotted= True)
         pca_runner.upload_distribution(pc_distribution_results)

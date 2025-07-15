@@ -1,15 +1,13 @@
 import pandas as pd
 from db.connection import get_connection
-from data_access.base_repository import BaseRepository
 from models.rotation import RotationPCA
 
-class RotationRepository(BaseRepository):
+class RotationRepository:
     def __init__(self):
         """
         Initializes the MeasurementRepository with a database connection.
         """
-        super().__init__()
-        #self.conn = get_connection()
+        self.conn = get_connection()
 
     def get_existing_rotations(self):
         cursor = self.conn.cursor()

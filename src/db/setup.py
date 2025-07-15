@@ -44,20 +44,19 @@ def create_tables():
         )
     """)
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS pain_groups (
+        CREATE TABLE IF NOT EXISTS pain_group (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pain_type TEXT UNIQUE,
-            participant_id TEXT,
-            age INTEGER,
-            height_cm REAL,
-            weight_kg REAL,
-            instrument TEXT,
-            PRMD_shoulder_neck_right INTEGER,
-            PRMD_shoulder_neck_left INTEGER,
-            PRMD_upper_arm_right INTEGER,
-            PRMD_upper_arm_left INTEGER,
-            PRMD_ever INTEGER,
-            FOREIGN KEY (experiment_id) REFERENCES experiment(id)
+            pain_type TEXT UNIQUE
+        )
+    """)    
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS participant_pain_groups (
+            pain_group_id INTEGER,
+            participant_id INTEGER,
+            FOREIGN KEY (pain_group_id) REFERENCES pain_group(id)
+            FOREIGN KEY (participant_id) REFERENCES participant(id)
+            UNIQUE (pain_group_id, participant_id)
         )
     """)    
     cursor.execute("""
@@ -113,6 +112,7 @@ def create_tables():
             key TEXT,
             time_point INTEGER,
             value REAL,
+            UNIQUE(measurement_id, bow_stroke, time_point),
             FOREIGN KEY (measurement_id) REFERENCES measurement(id),
             FOREIGN KEY (sample_id) REFERENCES sample(id)
         )
@@ -195,7 +195,7 @@ def create_tables():
      
     # Add pain_group table
     cursor.execute("""
-        CREATE TABLE participant_pain_group (
+        CREATE TABLE IF NOT EXISTS participant_pain_group (
             participant_id INTEGER NOT NULL,
             pain_group_id INTEGER NOT NULL,
             FOREIGN KEY (participant_id) REFERENCES participant(id),

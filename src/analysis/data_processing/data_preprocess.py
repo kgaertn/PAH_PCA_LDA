@@ -26,7 +26,7 @@ class DataProcessor:
         for meas_id in measurement_ids:
             if meas_id in meas_ids_with_samples:
                 continue 
-            df_meas = self.dp_repo.get_datapoints_by_meas_id(meas_id)
+            df_meas = self.dp_repo.get(table_or_view='datapoint', measurement_id = meas_id)
             full_stroke_df = self.combine_half_strokes_to_full_cycles(df_meas)
 
             

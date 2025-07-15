@@ -22,13 +22,13 @@ class PCARunner:
         self.data_plotter = DataPlotter()
         self.assumptions_tester = AssumptionsTester()
     
-    def run_pca_analysis(self,exp_id, measurement_tp, device, pain_group, scale_data = True, scaler_type = 'standard_scaler', check_requirements = False):
-        existing_target_axes = self.data_loader.get_existing_target_axis_exp(device, exp_id, measurement_tp)
+    def run_pca_analysis(self,exp_id, measurement_tp, device, pain_groups, scale_data = True, scaler_type = 'standard_scaler', check_requirements = False):
+        existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
         total_pca_info = {}
         for target, axis in existing_target_axes:
-            if(target, axis)== ('left radioulnar joint angle', 'Y'):
-                print("")
-            df_sorted, df_sorted_transformed  = self.load_data_for_pca(device,measurement_tp, target, axis)
+            participant_ids = self.get_participants_pain_groups(pain_groups)
+            # TODO: load data by participant ids, except for only target axis
+            df_sorted, df_sorted_transformed  = self.load_data_for_pca(exp_id, device,measurement_tp, target, axis, participant_ids)
             df_transformed = self.process_data_for_pca(df_sorted)
             df_outliers_removed, count_outliers = self.check_and_remove_outliers(df_transformed)
             
@@ -69,6 +69,33 @@ class PCARunner:
                 }
             })
         return total_pca_info
+    
+    def get_participants_pain_groups(self, pain_groups):
+        """"""
+        existing_pain_groups = self.data_loader.load_existing_pain_groups()        
+        existing_group_names = [pg.pain_group for pg in existing_pain_groups] if existing_pain_groups else set()
+        all_participant_ids = []
+        for pain_group in pain_groups:
+            if pain_group not in existing_group_names:
+                participant_ids = self.upload_new_pain_group(pain_group) 
+            else:
+                pain_group_id = next(
+                    (pg.id for pg in existing_pain_groups if pg.pain_group == pain_group),
+                    None
+                    )
+                participant_ids = self.data_loader.load_participants_by_pain_group(pain_group_id)
+                print("")
+                
+            all_participant_ids.extend(participant_ids)
+        return all_participant_ids
+    # TODO: select existing pain groups
+    # TODO: upload pain group, if not exists
+    # TODO: select participant_ids belonging to the respective pain groups
+    # TODO: add pain group info to db, OR 
+    
+    def upload_new_pain_group(self, pain_group):
+        return self.data_loader.upload_new_pain_group(pain_group)
+        """"""
     
     def upload_pca_analysis(self, pca_info):
         for target_axis, target_axis_data in pca_info.items():
@@ -170,16 +197,16 @@ class PCARunner:
         df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_key_normalized, 'value_centered','dp_time_point')
         return df_transformed
     
-    def load_data_for_pca(self, device, measurement_tp, target, axis):
+    def load_data_for_pca(self, exp_id, device, measurement_tp, target, axis, participant_ids):
         # TODO: select pain groups from DB, if pain_group not in db: upload new pain group
-        df = self.data_loader.load_MPA_clean_data_by_device_tp_target_axis(device, measurement_tp, target, axis)
+        df = self.data_loader.load_MPA_clean_data_by_device_tp_target_axis(exp_id, device, measurement_tp, target, axis, participant_ids)
         print(f"{target} {axis} loaded")
     # select the correct participants, based on their pain location
-        pain_columns = ['PRMD_shoulder_neck_right', 'PRMD_shoulder_neck_left']
-        control_column = 'PRMD_ever'
-        df_pain = self.data_processor.select_pain_data(df, pain_columns, control_column)
+        #pain_columns = ['PRMD_shoulder_neck_right', 'PRMD_shoulder_neck_left']
+        #control_column = 'PRMD_ever'
+        #df_pain = self.data_processor.select_pain_data(df, pain_columns, control_column)
         #df_reduced = df_pain[["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 'target', 'axis', "sample_id", 'dp_time_point', 'value']]
-        df_reduced = df_pain[[
+        df_reduced = df[[
             'participant_id', 'ext_participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever',
             'measurement_id', 'measurement_type_id', 'target', 'axis', 'sample_id', 'bow_stroke', 'up_down', 'key', 'dp_time_point',
             'value'

@@ -118,7 +118,7 @@ class UploaderService:
                             if datapoints != []:
                                 self.datapoint_repo.insert_many_datapoints(datapoints)
                     print("Participant " + str(ext_part_id) + " uploaded to the DB")
-            self.experiment_repo.experiment_upload_complete(relative_path, exp_id) 
+            self.experiment_repo.update_upload_complete(relative_path, exp_id) 
             
     def upload_mpa_pain(self, file_path: str) -> None:
         parser = self._choose_parser(file_path)
