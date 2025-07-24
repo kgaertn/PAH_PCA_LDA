@@ -67,12 +67,144 @@ class PCScoresRepository(BaseRepository):
 
         return self.get(table_or_view="[Participants PCs]", **filters)
    
-    def get_pc_scores_by_tp_rank(self, exp_id, device, meas_timepoint, min_rank, max_rank):
-        query = """
-            SELECT * FROM [Participants PCs]
-            WHERE exp_id = ? AND device = ? AND meas_time_point = ? AND rank BETWEEN ? AND ?
-            ORDER BY rank
-        """
-        params = (exp_id, device, meas_timepoint, min_rank, max_rank)
+    def get_rotated_pc_scores(self, exp_id, device, meas_timepoint, nr_components=None):
+        if nr_components is not None:
+            query = """
+                WITH top_pcs AS (
+                    SELECT pc_id
+                    FROM [Participants PCs]
+                    WHERE exp_id = ? 
+                    AND device = ? 
+                    AND meas_time_point = ?
+                    AND (
+                        rotation_type != 'unrotated'
+                        OR (
+                            rotation_type = 'unrotated'
+                            AND pc_id NOT IN (
+                                SELECT parent_id
+                                FROM [Participants PCs]
+                                WHERE parent_id IS NOT NULL
+                            )
+                        )
+                    )
+                    GROUP BY pc_id
+                    ORDER BY MAX(ABS(t_value)) DESC
+                    LIMIT ?
+                )
+                SELECT *
+                FROM [Participants PCs]
+                WHERE pc_id IN (SELECT pc_id FROM top_pcs)
+                ORDER BY ABS(t_value) DESC
+            """
+            params = [exp_id, device, meas_timepoint, nr_components]
+        else:
+            query = """
+                SELECT *
+                FROM [Participants PCs]
+                WHERE exp_id = ? 
+                AND device = ? 
+                AND meas_time_point = ? 
+                AND (
+                    rotation_type != 'unrotated'
+                    OR (
+                        rotation_type = 'unrotated'
+                        AND pc_id NOT IN (
+                            SELECT parent_id
+                            FROM [Participants PCs]
+                            WHERE parent_id IS NOT NULL
+                        )
+                    )
+                )
+                ORDER BY ABS(t_value) DESC
+            """
+            params = [exp_id, device, meas_timepoint]
+
         return self.get_raw_query(query, params)
+    
+    def get_unrotated_pc_scores(self, exp_id, device, meas_timepoint, nr_components=None):
+        if nr_components is not None:
+            query = """
+                WITH top_pcs AS (
+                    SELECT pc_id
+                    FROM [Participants PCs]
+                    WHERE exp_id = ? 
+                    AND device = ? 
+                    AND meas_time_point = ?
+                    AND rotation_type = 'unrotated'
+                    GROUP BY pc_id
+                    ORDER BY MAX(ABS(t_value)) DESC
+                    LIMIT ?
+                )
+                SELECT *
+                FROM [Participants PCs]
+                WHERE pc_id IN (SELECT pc_id FROM top_pcs)
+                ORDER BY ABS(t_value) DESC
+            """
+            params = [exp_id, device, meas_timepoint, nr_components]
+        else:
+            query = """
+                SELECT *
+                FROM [Participants PCs]
+                WHERE exp_id = ?
+                AND device = ?
+                AND meas_time_point = ?
+                AND rotation_type = 'unrotated'
+                ORDER BY ABS(t_value) DESC
+            """
+            params = [exp_id, device, meas_timepoint]
+
+        return self.get_raw_query(query, params)
+   
+    #def get_pc_scores_by_tp_rank(self, exp_id, device, meas_timepoint, min_rank, max_rank, select_rotated=False):
+    #    if select_rotated:
+    #        query = """
+    #            SELECT *
+    #            FROM [Participants PCs]
+    #            WHERE exp_id = ? 
+    #            AND device = ? 
+    #            AND meas_time_point = ? 
+    #            AND (
+    #                rotation_type != 'unrotated'
+    #                OR (
+    #                    rotation_type = 'unrotated'
+    #                    AND pc_id NOT IN (
+    #                        SELECT parent_id
+    #                        FROM [Participants PCs]
+    #                        WHERE parent_id IS NOT NULL
+    #                    )
+    #                )
+    #            )
+    #            AND rank BETWEEN ? AND ?
+    #            ORDER BY ABS(t_value) DESC;
+    #        """
+    #    else:
+    #        query = """
+    #            SELECT *
+    #            FROM [Participants PCs]
+    #            WHERE exp_id = ? 
+    #            AND device = ? 
+    #            AND meas_time_point = ?
+    #            AND rotation_type = 'unrotated'
+    #            AND rank BETWEEN ? AND ?
+    #            ORDER BY ABS(t_value) DESC;
+    #        """
+#
+    #    return self.conn.execute(query, (exp_id, device, meas_timepoint, min_rank, max_rank)).fetchall()
+   #
+   #
+   #
+    #def get_pc_scores_by_tp_rank(self, exp_id, device, meas_timepoint, min_rank, max_rank, select_rotated = False):
+    #    query = """
+    #        SELECT *
+    #        FROM [Participants PCs]
+    #        WHERE exp_id = ? AND device = ? AND meas_time_point = ?
+    #        ORDER BY ABS(t_value) DESC
+    #        LIMIT 10;
+    #    
+    #        SELECT * FROM [Participants PCs]
+    #        WHERE exp_id = ? AND device = ? AND meas_time_point = ? AND rank BETWEEN ? AND ?
+    #        ORDER BY rank
+    #    """
+    #    params = (exp_id, device, meas_timepoint, min_rank, max_rank)
+    #    return self.get_raw_query(query, params)
 # endregion Getter

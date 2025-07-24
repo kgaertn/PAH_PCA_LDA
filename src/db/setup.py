@@ -50,15 +50,15 @@ def create_tables():
         )
     """)    
     
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS participant_pain_groups (
-            pain_group_id INTEGER,
-            participant_id INTEGER,
-            FOREIGN KEY (pain_group_id) REFERENCES pain_group(id)
-            FOREIGN KEY (participant_id) REFERENCES participant(id)
-            UNIQUE (pain_group_id, participant_id)
-        )
-    """)    
+    #cursor.execute("""
+    #    CREATE TABLE IF NOT EXISTS participant_pain_groups (
+    #        pain_group_id INTEGER,
+    #        participant_id INTEGER,
+    #        FOREIGN KEY (pain_group_id) REFERENCES pain_group(id)
+    #        FOREIGN KEY (participant_id) REFERENCES participant(id)
+    #        UNIQUE (pain_group_id, participant_id)
+    #    )
+    #""")    
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS measurement_type (
             id INTEGER PRIMARY KEY AUTOINCREMENT,  
@@ -123,13 +123,11 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS pcs_ranked (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             measurement_type_id INTEGER,
-            pain_group_id INTEGER,
             scaler_id INTEGER NULL,
             rotation_id INTEGER,
             parent_id INTEGER,
             pc_index INTEGER,
             loading_vector TEXT,
-            rank INTEGER,
             explained_variance REAL,
             group_mean_pain REAL, 
             group_mean_no_pain REAL,
@@ -144,7 +142,6 @@ def create_tables():
             shap_wilk_w_no_pain REAL,
             shap_wilk_p_pain REAL,
             shap_wilk_p_no_pain REAL,
-            FOREIGN KEY (pain_group_id) REFERENCES pain_group(id)
             FOREIGN KEY (measurement_type_id) REFERENCES measurement_type(id)
             FOREIGN KEY (parent_id) REFERENCES pcs_ranked(id)
             UNIQUE (measurement_type_id, scaler_id, rotation_id, parent_id, pc_index, data_scaled)
@@ -203,6 +200,17 @@ def create_tables():
             PRIMARY KEY (participant_id, pain_group_id)
         );
     """)    
+
+    # Add pain_group table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS pcs_ranked_pain_group (
+            pc_id INTEGER NOT NULL,
+            pain_group_id INTEGER NOT NULL,
+            FOREIGN KEY (pc_id) REFERENCES pcs_ranked(id),
+            FOREIGN KEY (pain_group_id) REFERENCES pain_group(id),
+            PRIMARY KEY (pc_id, pain_group_id)
+        );
+    """)  
             
     # Add index on measurement_id in datapoint
     cursor.execute("""
@@ -323,23 +331,58 @@ def create_PCA_View():
     cursor = conn.cursor()
     cursor.execute("""
         CREATE VIEW IF NOT EXISTS "Participants PCs" AS
-			SELECT
-               e.id AS exp_id, p.id AS participant_id, p.participant_id AS ext_participant_id, p.PRMD_shoulder_neck_left, 
-			   p.PRMD_shoulder_neck_right, p.PRMD_ever, m.device, mt.id AS meas_type_id, m.timepoint AS meas_time_point, m.target, m.axis, 
-			   pcr.id AS pc_id, pcr.pc_index, pcr.rank, pcr.loading_vector, pcr.explained_variance, 
-			   pcr.group_mean_pain, pcr.group_mean_no_pain, pcr.group_std_pain, pcr.group_std_no_pain, pcr.t_value, pcr.p_value, pcr.data_scaled, rot.rotation_type,
-                pcr.distribution_info, pcr.shap_wilk_w_pain, pcr.shap_wilk_w_no_pain, pcr.shap_wilk_p_pain, pcr.shap_wilk_p_no_pain, 
-			   s.id AS sample_id, pcs.pc_score
+            WITH pain_groups_agg AS (
+                SELECT 
+                    ppg.participant_id,
+                    GROUP_CONCAT(pg.pain_type, ', ') AS pain_groups
+                FROM participant_pain_group ppg
+                JOIN pain_group pg ON ppg.pain_group_id = pg.id
+                GROUP BY ppg.participant_id
+            )
+
+            SELECT
+                e.id AS exp_id, 
+                p.id AS participant_id, 
+                p.participant_id AS ext_participant_id, 
+                p.PRMD_ever, 
+                pg_agg.pain_groups,  -- Verschoben nach PRMD_ever
+                m.device, 
+                mt.id AS meas_type_id, 
+                m.timepoint AS meas_time_point, 
+                m.target, 
+                m.axis, 
+                pcr.id AS pc_id, 
+                pcr.parent_id,
+                pcr.pc_index, 
+                pcr.loading_vector, 
+                pcr.explained_variance, 
+                pcr.group_mean_pain, 
+                pcr.group_mean_no_pain, 
+                pcr.group_std_pain, 
+                pcr.group_std_no_pain, 
+                pcr.t_value, 
+                pcr.p_value, 
+                pcr.data_scaled, 
+                rot.rotation_type,
+                pcr.distribution_info, 
+                pcr.shap_wilk_w_pain, 
+                pcr.shap_wilk_w_no_pain, 
+                pcr.shap_wilk_p_pain, 
+                pcr.shap_wilk_p_no_pain, 
+                s.id AS sample_id, 
+                pcs.pc_score
 
             FROM experiment e
-			JOIN participant p ON p.experiment_id = e.id
+            JOIN participant p ON p.experiment_id = e.id
             JOIN measurement m ON m.participant_id = p.id
-			JOIN measurement_type mt ON m.measurement_type_id = mt.id
+            JOIN measurement_type mt ON m.measurement_type_id = mt.id
             JOIN pcs_ranked pcr ON mt.id = pcr.measurement_type_id
-            JOIN pca_rotation AS rot ON mt.id = rot.measurement_type_id
-			JOIN sample s ON m.id = s.measurement_id
+            JOIN pca_rotation AS rot ON pcr.rotation_id = rot.id
+            JOIN sample s ON m.id = s.measurement_id
             JOIN pc_scores pcs ON s.id = pcs.sample_id AND pcr.id = pcs.pc_id
-            WHERE mt.rotation_sequence != 'carrying_angle';
+            LEFT JOIN pain_groups_agg pg_agg ON pg_agg.participant_id = p.id
+
+            WHERE mt.rotation_sequence != 'carrying_angle'; 
     """)
 
 def fill_measurement_type_table():

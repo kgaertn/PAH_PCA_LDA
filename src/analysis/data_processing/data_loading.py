@@ -48,12 +48,14 @@ class DataLoader:
         scaler_id = self.scaler_repo.insert_new_scaler(scaler)
         return scaler_id
     
-    def upload_pca(self, meas_type_id, pc_index, loading_vector, explained_variance, data_scaled, scaler_id):
+    def upload_pca(self, meas_type_id, parent_id, pc_index, loading_vector, explained_variance, data_scaled, scaler_id, rotation_id):
         """"""
         pc = PC_Ranked(
             id = 1,
             measurement_type_id=meas_type_id,
+            parent_id = parent_id,
             scaler_id = scaler_id,
+            rotation_id=rotation_id,
             pc_index=pc_index,
             loading_vector=loading_vector,
             explained_variance=explained_variance,
@@ -74,12 +76,16 @@ class DataLoader:
             ))
         self.pc_scores_repo.insert_many_pc_scores(pc_scores)
         
-    def load_pc_data(self, exp_id, device, meas_timepoint, distribution_info = None, rotation_type = 'unrotated'):
-        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device, meas_timepoint, distribution_info, rotation_type)
+    def load_pc_data(self, exp_id, device, meas_timepoint, distribution_info = None):
+        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device, meas_timepoint, distribution_info)
         return df
     
-    def load_pcs_by_rank(self, exp_id, device, meas_tp, min_rank, max_rank):
-        df = self.pc_scores_repo.get_pc_scores_by_tp_rank(exp_id, device,meas_tp, min_rank, max_rank)
+    def load_pcs_by_rank(self, exp_id, device, meas_tp, nr_components = None, select_rotated = False):
+        if select_rotated:
+            df = self.pc_scores_repo. get_rotated_pc_scores(exp_id, device, meas_tp, nr_components= nr_components)
+        else:
+            df = self.pc_scores_repo. get_unrotated_pc_scores(exp_id, device, meas_tp, nr_components= nr_components)
+        #df = self.pc_scores_repo.get_pc_scores_by_tp_rank(exp_id, device,meas_tp, nr_components)
         return df
     
     def upload_t_test_results(self, df):
@@ -88,7 +94,7 @@ class DataLoader:
             t_test_results.append(PC_Ranked(
                 id = row['pc_id'],
                 measurement_type_id= 1,
-                rank = idx + 1,
+                #rank = idx + 1,
                 group_mean_pain=row['mean_pain'],
                 group_mean_no_pain=row['mean_no_pain'],
                 group_std_pain=row['std_pain'],
@@ -99,10 +105,13 @@ class DataLoader:
         self.pc_ranked_repo.update_multiple_t_test_info(t_test_results)
    
     def load_specific_scaler(self, meas_type_id, scaler_type):
-        scaler_info = self.scaler_repo.get_scaler_by_meas_type_id_scaler_type(meas_type_id, scaler_type)    
-        scaler = StandardScaler()
-        scaler.mean_ = scaler_info.mean
-        scaler.scale_ = scaler_info.scale
+        scaler_info = self.scaler_repo.get_scaler_by_meas_type_id_scaler_type(meas_type_id, scaler_type)  
+        if scaler_info != None:  
+            scaler = StandardScaler()
+            scaler.mean_ = scaler_info.mean
+            scaler.scale_ = scaler_info.scale
+        else:
+            scaler = None
         return scaler, scaler_info
     
     
@@ -145,7 +154,7 @@ class DataLoader:
                               target = target, axis = axis, participant_id = participant_ids)
         return df   
          
-    def load_MPA_clean_data_by_device_tp_target_axis_participants(self,exp_id, device:str, timepoint:str, target:str,  part_ids:tuple, axis:str = None):
+    def load_MPA_clean_data_by_device_tp_target_axis_participants(self,exp_id, device:str, timepoint:str, target:str,  part_ids:list[int] = None, axis:str = None):
         """
         Load and filter datapoints for a specific joint from the 'mocap' device
         at the 'pre' timepoint of experiment ID 1.
@@ -158,7 +167,7 @@ class DataLoader:
             to the specified joint.
         """
         df = self.dp_repo.get(table_or_view="[Complete Data]",experiment_id = exp_id, device = device, timepoint = timepoint, 
-                              target = target, axis = axis)
+                              target = target, axis = axis, participant_id = part_ids)
         return df   
     
     def load_data_one_joint(self, exp_id, device, timepoint, target:str) -> pd.DataFrame:
@@ -212,6 +221,44 @@ class DataLoader:
             pain_columns = [name for name in column_names if pain_group.lower() in name.lower()]
             participant_ids = self.part_repo.get_pain_participants(pain_columns, 1)
         self.pain_group_repo.insert_participant_pain_groups(participant_ids, pain_group_id)
-        return participant_ids     
-        print("")
+        return participant_ids, pain_group_id     
+        #print("")
+    
+    def upload_pc_pain_group_ids(self,pc_id, pain_group_id):
+        self.pain_group_repo.insert_pc_pain_group(pc_id, pain_group_id)
         
+    def upload_new_rotation_type(self, rotation_type):
+        existing_rotation_types = self.load_existing_rotation_types()        
+        existing_rotation_type_names = [rt.rotation_type for rt in existing_rotation_types] if existing_rotation_types else set()        
+        if rotation_type not in existing_rotation_type_names:
+            rotation_type_id = self.rot_repo.insert_rotation_type(rotation_type)
+        else:
+            rotation_type_id = next(
+                (rt.id for rt in existing_rotation_types if rt.rotation_type == rotation_type),
+                None
+                )
+        return rotation_type_id
+    
+    def load_existing_rotation_types(self):
+        return self.rot_repo.get_existing_rotations()
+    
+    def get_participants_pain_groups(self, pain_groups):
+        """"""
+        existing_pain_groups = self.load_existing_pain_groups()        
+        existing_group_names = [pg.pain_group for pg in existing_pain_groups] if existing_pain_groups else set()
+        all_participant_ids = []
+        all_pain_group_ids = []
+        for pain_group in pain_groups:
+            if pain_group not in existing_group_names:
+                participant_ids, pain_group_id = self.upload_new_pain_group(pain_group) 
+            else:
+                pain_group_id = next(
+                    (pg.id for pg in existing_pain_groups if pg.pain_group == pain_group),
+                    None
+                    )
+                participant_ids = self.load_participants_by_pain_group(pain_group_id)
+                print("")
+                
+            all_participant_ids.extend(participant_ids)
+            all_pain_group_ids.extend([pain_group_id])
+        return all_participant_ids, all_pain_group_ids

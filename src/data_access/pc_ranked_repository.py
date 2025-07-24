@@ -14,7 +14,9 @@ class PCRankedRepository(BaseRepository):
     def insert_new_pc(self, pc: PC_Ranked):
         data = {
             "measurement_type_id": pc.measurement_type_id,
+            "parent_id":pc.parent_id,
             "scaler_id": pc.scaler_id,
+            "rotation_id": pc.rotation_id,
             "pc_index": pc.pc_index,
             "loading_vector": pc.loading_vector_to_json(),
             "explained_variance": pc.explained_variance,
@@ -27,7 +29,7 @@ class PCRankedRepository(BaseRepository):
         for pc in t_test_results:
             values.append({
                 "id": pc.id,
-                "rank": pc.rank,
+                #"rank": pc.rank,
                 "group_mean_pain": pc.group_mean_pain,
                 "group_mean_no_pain": pc.group_mean_no_pain,
                 "group_std_pain": pc.group_std_pain,

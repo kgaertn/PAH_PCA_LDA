@@ -22,7 +22,7 @@ class AssumptionsTester:
         target_axes = df[['target', 'axis', 'pc_index', 'pc_id']].drop_duplicates().values.tolist()
         pc_distribution_results = []
         for target, axis, pc_index, pc_id in target_axes:
-            stat_pain, p_pain, stat_nopain, p_nopain = self.shapiro_wilk_test(df_mean, target, axis, pc_index)
+            stat_pain, p_pain, stat_nopain, p_nopain = self.shapiro_wilk_test(df_mean, target, axis, pc_id)
             distribution_info = 'normal_distribution' if p_pain > 0.05 and p_nopain > 0.05 else 'non_normal_distribution'
             pc_distribution_results.append(PC_Ranked(
                 id = pc_id,
@@ -57,9 +57,9 @@ class AssumptionsTester:
             
     
     @staticmethod    
-    def shapiro_wilk_test(df, target, axis, pc_index):
-        pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
-        nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
+    def shapiro_wilk_test(df, target, axis, pc_id):
+        pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_id'] == pc_id)]['pc_score']
+        nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_id'] == pc_id)]['pc_score']
         stat_pain, p_pain = st.shapiro(pain_group)
         stat_nopain, p_nopain = st.shapiro(nopain_group)
         return stat_pain, p_pain, stat_nopain, p_nopain

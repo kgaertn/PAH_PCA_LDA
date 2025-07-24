@@ -12,7 +12,7 @@ class SampleRepository(BaseRepository):
         #self.conn = get_connection()
 
 # region Setter
-    def insert_datapoint(self, sample: Sample) -> int:
+    def insert_sample(self, sample: Sample) -> int:
         data = {
             "measurement_id": sample.measurement_id,
             "bow_stroke_start": int(sample.bow_stroke_start),

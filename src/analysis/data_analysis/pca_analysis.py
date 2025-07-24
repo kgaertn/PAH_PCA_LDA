@@ -371,8 +371,8 @@ class PCAAnalyser:
         # update the mean calculation
         mean_waveform_pain, mean_waveform_no_pain, mean_waveform_total = self.calculate_mean_waveform_target_axis(orig_df)       
         
-        lower_band_pain, upper_band_pain = self.calculate_lower_upper_band_unscaled(pc_scores_pain, mean_waveform_total, loading_vector, scaler)
-        lower_band_nopain, upper_band_nopain = self.calculate_lower_upper_band_unscaled(pc_scores_nopain, mean_waveform_total, loading_vector, scaler)
+        lower_band_pain, upper_band_pain = self.calculate_lower_upper_band_unscaled(pc_scores_pain, mean_waveform_pain, loading_vector, scaler)
+        lower_band_nopain, upper_band_nopain = self.calculate_lower_upper_band_unscaled(pc_scores_nopain, mean_waveform_no_pain, loading_vector, scaler)
         lower_band, upper_band = self.calculate_lower_upper_band_unscaled(pc_scores, mean_waveform_total, loading_vector, scaler)        
         
         return {

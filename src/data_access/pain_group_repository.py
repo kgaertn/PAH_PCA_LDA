@@ -23,6 +23,13 @@ class PainGroupRepository(BaseRepository):
         }
         self.insert_one("participant_pain_group", data)
 
+    def insert_pc_pain_group(self, pc_id, pain_group_id):
+        data = {
+            "pc_id": pc_id,
+            "pain_group_id": pain_group_id
+        }
+        self.insert_one("pcs_ranked_pain_group", data)
+
     def insert_participant_pain_groups(self, participant_ids: list[int], pain_group_id: int):
         """
         Inserts multiple participant-pain group assignments.

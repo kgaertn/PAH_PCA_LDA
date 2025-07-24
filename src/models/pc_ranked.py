@@ -7,6 +7,8 @@ class PC_Ranked:
     id: int
     measurement_type_id: int
     scaler_id: Optional[int] = None
+    rotation_id: Optional[int] = None
+    parent_id: Optional[int] = None
     pc_index: Optional[int] = None
     loading_vector: Optional[List[float]] = None
     data_scaled: Optional[bool] = None

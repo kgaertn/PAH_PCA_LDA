@@ -63,7 +63,8 @@ class ScalerRepository(BaseRepository):
         """
         result = self.get_advanced(
             table_or_view="scaler",
-            filters={"measurement_type_id": meas_type_id, "scaler_type": scaler_type},
+            measurement_type_id= meas_type_id, 
+            scaler_type= scaler_type,
             return_df=False
         )
         if result:
