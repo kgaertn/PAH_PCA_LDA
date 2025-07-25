@@ -28,14 +28,13 @@ class GeneralAnalysisRunner:
             filename = f"{pain_group_names}_{measurement_tp}_Original_Mean_Std_{target}_{axis}"
             if key_diff_controlled:
                 df_pain = self.data_processor.subtract_meanwave_key_difference(df_pain)
+                #df_pain['value'] = df_pain['value_centered'] 
                 filename = "Key_controled_" + filename
-            #pain_columns = ['PRMD_shoulder_neck_right', 'PRMD_shoulder_neck_left']
-            #control_column = 'PRMD_ever'
-            #df_pain = self.data_processor.select_pain_data(df, pain_columns, control_column)
-            #print("")
-            
+                if df_pain['key_difference'].abs().mean() > 5:
+                    print("")
+            value_cols = ['value_centered'] if key_diff_controlled else ['value']
             title = f"{pain_group_names}, {target}, {axis}: Mean and Std Dev over Time"
-            fig = self.data_plotter.plot_mean_std_by_group(df_pain, time_col='dp_time_point', value_cols=['value'], group_col='PRMD_ever', title=title)
+            fig = self.data_plotter.plot_mean_std_by_group(df_pain, time_col='dp_time_point', value_cols=value_cols, group_col='PRMD_ever', title=title)
             current_path = Path.cwd()
             #output_path = current_path / "output" / "plots"
             output_path = current_path / "output" / "plots" / "Mean_Std"

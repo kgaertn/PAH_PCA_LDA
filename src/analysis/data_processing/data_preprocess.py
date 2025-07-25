@@ -244,7 +244,7 @@ class DataProcessor:
             )
             
             df_mean_merged = df_mean_key.merge(df_mean_group, on=['dp_time_point'])
-            df_mean_merged['key_difference'] = df_mean_merged['mean_value'] - df_mean_merged['key_mean_value']
+            df_mean_merged['key_difference'] = df_mean_merged['key_mean_value'] - df_mean_merged['mean_value']
             
             df_group_merged = df_group.merge(df_mean_merged, on=['bow_stroke', 'key', 'dp_time_point'])
             df_group_merged['value_centered'] = df_group_merged['value'] - df_group_merged['key_difference']

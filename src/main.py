@@ -1,6 +1,7 @@
 from core.run_pca import PCARunner
 from core.run_general_analysis import GeneralAnalysisRunner
 def main():
+    # TODO: plot mean/std for one participant -> with the new key controlled features!
     pca_analysis_completed = False
     pca_uploads_completed = []
     #pca_uploads_completed = [(1,'pre','mocap')]
