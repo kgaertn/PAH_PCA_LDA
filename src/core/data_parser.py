@@ -8,12 +8,11 @@ from models.participant import Participant
 from models.measurement import Measurement
 from models.datapoint import Datapoint
 
-# Definiere ein Interface (Protocol) für Parser
+# Define an Interface (Protocol) for Parser
 class DataParser(Protocol):
     def parse(self, file_path: str) -> dict:
         """
-        Parsen der Datei und Rückgabe eines Dictionaries mit 
-        Keys z.B. "experiments", "participants", "measurements", "datapoints" und passenden Listen von Models
+        TODO TO BE IMPLEMENTED
         """
         ...
 
@@ -74,7 +73,7 @@ class FormatRawMPAParser:
         return data_points   
        
     def parse(self, file_path: str) -> dict:
-        # Parsen von Format B, z.B. 100 Datenpunkte pro Spalte etc.
+        
         source = "mocap" if ('joints' in str(file_path)) | ('JOINT' in str(file_path)) else 'emg'
         data_state = 'raw'
         experiment_name = 'mpa'
@@ -93,15 +92,11 @@ class FormatRawMPAParser:
                     experiment_data = (experiment_name, data_state)
                     participant_data = participant
                     measurement_data = (participant, pre_post, source, )
-                    
-                    #exp_id = self.db_manager.insert_experiment(experiment_data)       
+   
                     last_participant = participant    
                     last_pre_post = pre_post   
                     bow_stroke = 0   
-                
 
-
-                
         return {
             "experiments": [...],
             "participants": [...],
@@ -221,7 +216,7 @@ class FormatCleanMPAParser:
     
     @staticmethod
     def _extract_location(file_path:str) -> str:
-        # TODO: fix the location extraction
+        # TODO: fix the location extraction for EMG
         # Remove the axis and extension (e.g., "_Z.tsv")
         file_name = Path(file_path).name
         name = re.sub(r'_[XYZ]\.tsv$', '', file_name)
@@ -235,21 +230,19 @@ class FormatCleanMPAParser:
 
 class FormatRawRefLabParser:
     def parse(self, file_path: str) -> dict:
-        # Implementiere spezifische Logik zum Parsen von Format A
-        # Hier Excel mit Teilnehmer-IDs in einer Spalte, Daten in Spalten daneben
-        # z.B. mit pandas auslesen, Daten umwandeln in Models
+        """TODO: TO BE IMPLEMENTED"""
         ...
         return {
-            "experiments": [...],       # Liste von Experiment-Objekten
-            "participants": [...],      # Liste von Participant-Objekten
-            "measurements": [...],      # Liste von Measurement-Objekten
-            "datapoints": [...],        # Liste von Datapoint-Objekten
+            "experiments": [...],       
+            "participants": [...],      
+            "measurements": [...],      
+            "datapoints": [...],        
         }
 
 # Beispielhafte Parser-Implementierung für Format B
 class FormatCleanRefLabParser:
     def parse(self, file_path: str) -> dict:
-        # Parsen von Format B, z.B. 100 Datenpunkte pro Spalte etc.
+        """TODO: TO BE IMPLEMENTED"""
         ...
         return {
             "experiments": [...],

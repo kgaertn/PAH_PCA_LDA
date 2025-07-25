@@ -4,7 +4,7 @@ def main():
     pca_analysis_completed = False
     pca_uploads_completed = []
     #pca_uploads_completed = [(1,'pre','mocap')]
-    pca_uploads_completed = [(1,'pre','mocap'), (1,'post','mocap')]
+    #pca_uploads_completed = [(1,'pre','mocap'), (1,'post','mocap')]
     
     # config variables
     exp_id = 1
@@ -17,8 +17,8 @@ def main():
     general_analysis_runner = GeneralAnalysisRunner()
     
     #general_analysis_runner.create_plots_key_per_group(device, exp_id, measurement_tp, pain_groups)
-    general_analysis_runner.create_plots_mean_std_keys(device, exp_id, measurement_tp, pain_groups)
-    general_analysis_runner.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups)
+    #general_analysis_runner.create_plots_mean_std_keys(device, exp_id, measurement_tp, pain_groups)
+    general_analysis_runner.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups, True)
     
     if ((exp_id, measurement_tp, device) not in pca_uploads_completed):
         pca_results = pca_runner.run_pca_analysis(exp_id, measurement_tp, device, pain_groups, check_requirements=True)

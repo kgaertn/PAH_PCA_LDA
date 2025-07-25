@@ -1,6 +1,6 @@
 from db.connection import get_connection
 
-def adjusted_db_setup():
+def db_setup():
     create_tables()
     add_columns_if_missing('datapoint', new_columns = {'sample_id': 'INTEGER'})
     create_adjusted_view()
@@ -49,16 +49,7 @@ def create_tables():
             pain_type TEXT UNIQUE
         )
     """)    
-    
-    #cursor.execute("""
-    #    CREATE TABLE IF NOT EXISTS participant_pain_groups (
-    #        pain_group_id INTEGER,
-    #        participant_id INTEGER,
-    #        FOREIGN KEY (pain_group_id) REFERENCES pain_group(id)
-    #        FOREIGN KEY (participant_id) REFERENCES participant(id)
-    #        UNIQUE (pain_group_id, participant_id)
-    #    )
-    #""")    
+   
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS measurement_type (
             id INTEGER PRIMARY KEY AUTOINCREMENT,  
@@ -477,7 +468,28 @@ def add_rotation_sequuence():
 END;""")
     conn.commit()
     
-
+"""SELECT 
+    da.measurement_id,
+    da.sample_id,
+    da.time_point,
+	prev.time_point AS prev_time_point,
+    da.value,
+    
+    CASE
+        WHEN da.time_point = 0 THEN
+            0
+        ELSE
+            (da.value - prev.value)
+    END AS ang_velocity
+FROM datapoint_adjusted da
+LEFT JOIN datapoint_adjusted prev ON
+    da.measurement_id = prev.measurement_id AND
+    da.sample_id = prev.sample_id AND
+    da.time_point = prev.time_point + 1
+LEFT JOIN measurement meas ON
+	da.measurement_id = meas.id
+WHERE meas.device = 'mocap' AND meas.timepoint = 'pre'
+ORDER BY da.measurement_id, da.sample_id, da.time_point;"""
         
 
 if __name__ == "__main__":

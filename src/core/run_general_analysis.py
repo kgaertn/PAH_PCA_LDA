@@ -18,23 +18,28 @@ class GeneralAnalysisRunner:
         self.data_loader = DataLoader()
         self.data_plotter = DataPlotter()
         
-    def create_plots_mean_std(self, device, exp_id, measurement_tp, pain_groups):
+    def create_plots_mean_std(self, device, exp_id, measurement_tp, pain_groups, key_diff_controlled = False):
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
         total_pca_info = {}
         for target, axis in existing_target_axes:
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df_pain = self.data_loader.load_MPA_clean_data_by_device_tp_target_axis(exp_id, device, measurement_tp, target, axis, participant_ids)
+            pain_group_names = self.concat_pain_groups(pain_groups)
+            filename = f"{pain_group_names}_{measurement_tp}_Original_Mean_Std_{target}_{axis}"
+            if key_diff_controlled:
+                df_pain = self.data_processor.subtract_meanwave_key_difference(df_pain)
+                filename = "Key_controled_" + filename
             #pain_columns = ['PRMD_shoulder_neck_right', 'PRMD_shoulder_neck_left']
             #control_column = 'PRMD_ever'
             #df_pain = self.data_processor.select_pain_data(df, pain_columns, control_column)
             #print("")
-            pain_group_names = self.concat_pain_groups(pain_groups)
+            
             title = f"{pain_group_names}, {target}, {axis}: Mean and Std Dev over Time"
             fig = self.data_plotter.plot_mean_std_by_group(df_pain, time_col='dp_time_point', value_cols=['value'], group_col='PRMD_ever', title=title)
             current_path = Path.cwd()
             #output_path = current_path / "output" / "plots"
             output_path = current_path / "output" / "plots" / "Mean_Std"
-            self.data_plotter.save_plot(fig, output_path, f"{pain_group_names}_{measurement_tp}_Original_Mean_Std_{target}_{axis}")
+            self.data_plotter.save_plot(fig, output_path, filename)
             #for key in df_pain['key'].unique():
             #    df_one_key = df_pain[df_pain['key'] == key]
             #    title = f"{target}, {axis}: key {key} Mean and Std Dev over Time"

@@ -194,8 +194,8 @@ class PCARunner:
 
         # subtract the key mean-waveform from each sample
         # TODO: save mean key per target/axis? / plot mean key? 
-        df_key_normalized, df_mean_key_waveform_target_axis = self.data_processor.subtract_meanwave_key(df_sorted)
-
+        #df_key_normalized, df_mean_key_waveform_target_axis = self.data_processor.subtract_meanwave_key(df_sorted)
+        df_key_normalized, df_mean_key_waveform_target_axis = self.data_processor.subtract_meanwave_key_difference(df_sorted)
         # transform the data (columns for each timepoint)
         df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_key_normalized, 'value_centered','dp_time_point')
         return df_transformed
