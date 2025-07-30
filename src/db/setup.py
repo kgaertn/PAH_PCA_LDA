@@ -289,7 +289,7 @@ def create_datapoints_MPA_view():
             JOIN measurement m ON m.participant_id = p.id
             JOIN datapoint_adjusted d ON d.measurement_id = m.id
             JOIN measurement_type mt ON m.measurement_type_id = mt.id
-            WHERE mt.rotation_sequence != 'carrying_angle';
+            WHERE mt.rotation_sequence NOT IN ('carrying_angle', 'redundant');
     """)
 
 #def create_datapoints_MPA_device_view(device_table_name:str, device:str):
@@ -324,19 +324,18 @@ def create_PCA_View():
         CREATE VIEW IF NOT EXISTS "Participants PCs" AS
             WITH pain_groups_agg AS (
                 SELECT 
-                    ppg.participant_id,
+                    prpg.pc_id,
                     GROUP_CONCAT(pg.pain_type, ', ') AS pain_groups
-                FROM participant_pain_group ppg
-                JOIN pain_group pg ON ppg.pain_group_id = pg.id
-                GROUP BY ppg.participant_id
-            )
-
+                FROM pcs_ranked_pain_group prpg
+                JOIN pain_group pg ON prpg.pain_group_id = pg.id
+                GROUP BY prpg.pc_id
+            )       
             SELECT
                 e.id AS exp_id, 
                 p.id AS participant_id, 
                 p.participant_id AS ext_participant_id, 
                 p.PRMD_ever, 
-                pg_agg.pain_groups,  -- Verschoben nach PRMD_ever
+                pg_agg.pain_groups, 
                 m.device, 
                 mt.id AS meas_type_id, 
                 m.timepoint AS meas_time_point, 
@@ -371,9 +370,9 @@ def create_PCA_View():
             JOIN pca_rotation AS rot ON pcr.rotation_id = rot.id
             JOIN sample s ON m.id = s.measurement_id
             JOIN pc_scores pcs ON s.id = pcs.sample_id AND pcr.id = pcs.pc_id
-            LEFT JOIN pain_groups_agg pg_agg ON pg_agg.participant_id = p.id
+            LEFT JOIN pain_groups_agg pg_agg ON pg_agg.pc_id = pcr.id
 
-            WHERE mt.rotation_sequence != 'carrying_angle'; 
+            WHERE mt.rotation_sequence NOT IN ('carrying_angle', 'redundant'); 
     """)
 
 def fill_measurement_type_table():
@@ -425,7 +424,7 @@ def add_rotation_sequuence():
 	WHEN target = 'left ht joint angle' AND axis = 'X' THEN 'abduction'
     WHEN target = 'left ht joint angle' AND axis = 'Y' THEN 'internal_rotation'
 	WHEN target = 'left ht joint angle' AND axis = 'Z' THEN 'flexion'
-	WHEN target = 'left humeroulnar joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'left humeroulnar joint angle' AND axis = 'Z' THEN 'redundant'
 	WHEN target = 'left radioulnar joint angle' AND axis = 'Y' THEN 'pronation'
 	WHEN target = 'left st joint angle' AND axis = 'X' THEN 'upward_rotation'
 	WHEN target = 'left st joint angle' AND axis = 'Y' THEN 'protraction'
@@ -443,7 +442,7 @@ def add_rotation_sequuence():
 	WHEN target = 'right ht joint angle' AND axis = 'X' THEN 'abduction'
     WHEN target = 'right ht joint angle' AND axis = 'Y' THEN 'internal_rotation'
 	WHEN target = 'right ht joint angle' AND axis = 'Z' THEN 'flexion'
-	WHEN target = 'right humeroulnar joint angle' AND axis = 'Z' THEN 'flexion'
+	WHEN target = 'right humeroulnar joint angle' AND axis = 'Z' THEN 'redundant'
 	WHEN target = 'right radioulnar joint angle' AND axis = 'Y' THEN 'pronation'
 	WHEN target = 'right st joint angle' AND axis = 'X' THEN 'upward_rotation'
 	WHEN target = 'right st joint angle' AND axis = 'Y' THEN 'protraction'

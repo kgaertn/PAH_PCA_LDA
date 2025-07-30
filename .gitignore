@@ -193,6 +193,7 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+SQL_queries/*
 
 data/*
 !data/.gitkeep

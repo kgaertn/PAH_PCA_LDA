@@ -226,33 +226,106 @@ class DataPlotter:
         fig.savefig(str(file_path) +'\\' + full_filename, dpi=dpi, format=file_format, bbox_inches='tight')
         plt.close()
         print(f"Plot saved to {full_filename}")
-        
-    @staticmethod    
-    def plot_distribution(df, column,target, axis, pc_index, meas_time_point, kind='hist', bins=10, **kwargs):
+    
+ 
+    def plot_distribution(self, df, column, target, axis, pc_index, meas_time_point, kind='hist', bins=10, **kwargs):
         """
-        Plot the distribution of a DataFrame column.
+        Plot the distribution of a DataFrame column for pain and no-pain groups as two subplots.
 
         Parameters:
         - df: pandas DataFrame
         - column: str, column name to plot
+        - target, axis, pc_index, meas_time_point: str/int, metadata for title
         - kind: 'hist' for histogram, 'kde' for density plot
         - bins: int, number of bins (used for histogram)
         - **kwargs: additional keyword arguments for plot customization
         """
-        fig, ax = plt.subplots(constrained_layout=True)
+
+        df_pain = df[df['PRMD_ever'] == 1]
+        df_nopain = df[df['PRMD_ever'] == 0]
+
+        fig, axs = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
+
         if kind == 'hist':
-            df.plot(kind='hist', bins=bins, edgecolor='black', ax = ax, **kwargs)
-            plt.xlabel(column)
-            plt.ylabel('Frequency')
-            plt.title(f'Histogram of PC Scores ({meas_time_point}): {target}, {axis}, PC {pc_index}')
+            axs[0].hist(
+                df_pain[column].dropna(),
+                bins=bins,
+                alpha=0.7,
+                edgecolor='black',
+                color=self.get_color_for_label('Pain'),
+                **kwargs
+            )
+            axs[0].set_title('Pain')
+            axs[0].set_xlabel(column)
+            axs[0].set_ylabel('Frequency')
+
+            axs[1].hist(
+                df_nopain[column].dropna(),
+                bins=bins,
+                alpha=0.7,
+                edgecolor='black',
+                color=self.get_color_for_label('No Pain'),
+                **kwargs
+            )
+            axs[1].set_title('No Pain')
+            axs[1].set_xlabel(column)
+            axs[1].set_ylabel('Frequency')
+
         elif kind == 'kde':
-            df.plot(kind='kde', ax = ax, **kwargs)
-            plt.xlabel(column)
-            plt.ylabel('Density')
-            plt.title(f'KDE of PC Scores: {target}, {axis}, PC {pc_index}')
+            df_pain[column].dropna().plot(
+                kind='kde',
+                ax=axs[0],
+                color=self.get_color_for_label('Pain'),
+                **kwargs
+            )
+            axs[0].set_title('Pain')
+            axs[0].set_xlabel(column)
+            axs[0].set_ylabel('Density')
+
+            df_nopain[column].dropna().plot(
+                kind='kde',
+                ax=axs[1],
+                color=self.get_color_for_label('No Pain'),
+                **kwargs
+            )
+            axs[1].set_title('No Pain')
+            axs[1].set_xlabel(column)
+            axs[1].set_ylabel('Density')
+
         else:
             raise ValueError("kind must be 'hist' or 'kde'")
+
+        fig.suptitle(f'{kind.upper()} of PC Scores ({meas_time_point}): {target}, {axis}, PC {pc_index}')
         return fig
+            
+    #@staticmethod    
+    #def plot_distribution(df, column,target, axis, pc_index, meas_time_point, kind='hist', bins=10, **kwargs):
+    #    """
+    #    Plot the distribution of a DataFrame column.
+#
+    #    Parameters:
+    #    - df: pandas DataFrame
+    #    - column: str, column name to plot
+    #    - kind: 'hist' for histogram, 'kde' for density plot
+    #    - bins: int, number of bins (used for histogram)
+    #    - **kwargs: additional keyword arguments for plot customization
+    #    """
+    #    fig, ax = plt.subplots(constrained_layout=True)
+    #    df_pain = df[df['PRMD_ever']==1]
+    #    df_nopain = df[df['PRMD_ever']==0]
+    #    if kind == 'hist':
+    #        df.plot(kind='hist', bins=bins, edgecolor='black', ax = ax, **kwargs)
+    #        plt.xlabel(column)
+    #        plt.ylabel('Frequency')
+    #        plt.title(f'Histogram of PC Scores ({meas_time_point}): {target}, {axis}, PC {pc_index}')
+    #    elif kind == 'kde':
+    #        df.plot(kind='kde', ax = ax, **kwargs)
+    #        plt.xlabel(column)
+    #        plt.ylabel('Density')
+    #        plt.title(f'KDE of PC Scores: {target}, {axis}, PC {pc_index}')
+    #    else:
+    #        raise ValueError("kind must be 'hist' or 'kde'")
+    #    return fig
     
     @staticmethod
     def plot_linearity(df, fig_title):

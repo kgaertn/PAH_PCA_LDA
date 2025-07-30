@@ -73,7 +73,9 @@ class PCScoresRepository(BaseRepository):
                 WITH top_pcs AS (
                     SELECT pc_id
                     FROM [Participants PCs]
-                    WHERE exp_id = ? 
+                    WHERE
+                    distribution_info = 'normal_distribution' 
+                    AND exp_id = ? 
                     AND device = ? 
                     AND meas_time_point = ?
                     AND (
@@ -127,7 +129,9 @@ class PCScoresRepository(BaseRepository):
                 WITH top_pcs AS (
                     SELECT pc_id
                     FROM [Participants PCs]
-                    WHERE exp_id = ? 
+                    WHERE 
+                    distribution_info = 'normal_distribution' 
+                    AND exp_id = ? 
                     AND device = ? 
                     AND meas_time_point = ?
                     AND rotation_type = 'unrotated'

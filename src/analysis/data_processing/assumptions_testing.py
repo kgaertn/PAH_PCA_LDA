@@ -33,7 +33,7 @@ class AssumptionsTester:
                 shap_wilk_p_pain=p_pain,
                 shap_wilk_p_no_pain=p_nopain ))
             if not distributions_plotted:
-                df_target_axis = df[(df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']        
+                df_target_axis = df[(df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)][['PRMD_ever','pc_score']]        
                 fig = self.data_plotter.plot_distribution(df_target_axis, 'pc_score', target, axis, pc_index, meas_time_point)
                 self.data_plotter.save_distribution_plot(fig, target, axis, pc_index, meas_time_point)
         print("")
@@ -69,7 +69,7 @@ class AssumptionsTester:
     @staticmethod    
     def calculate_kaiser_meyer_olkin(df):
         kmo_all, kmo_model = calculate_kmo(df)
-        if kmo_model < 0.6:
+        if kmo_model < 0.98:
             #print("KMO per variable:", kmo_all)
             print("Overall KMO:", kmo_model)
 

@@ -130,7 +130,7 @@ class DataLoader:
         target_axes = self.meas_repo.get_advanced(
             table_or_view = 'measurement_type',
             columns=['target', 'axis'], 
-            exclude={'rotation_sequence': 'carrying_angle'},
+            exclude={'rotation_sequence': ['carrying_angle','redundant']},
             order_by=['target', 'axis'],
             experiment_id = experiment,
             device = device,
@@ -216,6 +216,10 @@ class DataLoader:
         pain_group_id = self.pain_group_repo.insert_pain_group(pain_group)
         if pain_group == 'healthy':
             participant_ids = self.part_repo.get_pain_participants(['PRMD_ever'], 0)
+        elif pain_group == 'all':
+            participant_ids_no_pain = self.part_repo.get_pain_participants(['PRMD_ever'], 0)
+            participant_ids_pain = self.part_repo.get_pain_participants(['PRMD_ever'], 1)
+            participant_ids = participant_ids_no_pain + participant_ids_pain
         else:       
             column_names = self.part_repo.get_participant_column_names()
             pain_columns = [name for name in column_names if pain_group.lower() in name.lower()]

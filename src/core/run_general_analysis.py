@@ -165,3 +165,77 @@ class GeneralAnalysisRunner:
             output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "keys_per_group"
             output_path.mkdir(parents=True, exist_ok=True)
             self.data_plotter.save_plot(fig, output_path, f"{measurement_tp}_Combined_Mean_{target}_{axis}")
+    
+    def create_plots_key_per_participant(self, device, exp_id, measurement_tp, pain_groups):
+        existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
+        #pain_group_names = self.concat_pain_groups(pain_groups)
+        for target, axis in existing_target_axes:
+            participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
+            df = self.data_loader.load_MPA_clean_data_by_device_tp_target_axis(
+                exp_id, device, measurement_tp, target, axis, participant_ids
+            )
+            #if df.empty:
+            #    continue
+            df_key_norm = self.data_processor.subtract_meanwave_key_difference(df)
+            for participant_id in participant_ids:
+                part_df = df[df['participant_id'] == participant_id]
+                if part_df.empty:
+                    continue
+                part_df_norm = df_key_norm[df_key_norm['participant_id'] == participant_id]
+                ext_part_id = part_df['ext_participant_id'].unique()[0]
+                pain_group = "Pain" if part_df['PRMD_ever'].unique() == 1 else "No Pain"
+                fig, axes = plt.subplots(1, 2, figsize=(24, 6))
+                #plt.show()
+                all_y_values = []
+                for i in range(12):
+                    bs1 = i * 2
+                    bs2 = bs1 + 1
+                    df_pair = part_df[part_df['bow_stroke'].isin([bs1, bs2])]
+                    df_pair_norm = part_df_norm[part_df_norm['bow_stroke'].isin([bs1, bs2])]
+
+                    for group in range(2):
+                        ax = axes[group]
+                        key_1, key_2 = df_pair['key'].unique()[0], df_pair['key'].unique()[1]
+                        
+                        df_group = df_pair if group == 0 else df_pair_norm
+
+                        mean_series = df_group.groupby('dp_time_point')['value'].mean() if group == 0 else df_group.groupby('dp_time_point')['value_centered'].mean()
+                        #std_series = df_group.groupby('dp_time_point')['value'].std()
+                        all_y_values.extend(mean_series.values.tolist())
+
+                        label = f"{key_1}/{key_2}"
+                        ax.plot(mean_series.index, mean_series.values, label=label)
+                        #ax.fill_between(
+                        #    mean_series.index,
+                        #    mean_series - std_series,
+                        #    mean_series + std_series,
+                        #    alpha=0.2
+                        #)
+
+                        ax.set_title(f"{'Key_controlled' if group else 'Raw'}")
+                        ax.legend(loc='upper right', fontsize='small')
+                        ax.set_xlabel("Time point")
+                        ax.set_ylabel("Value")
+
+                    #ax.set_title(f"{'Key_controlled' if group else 'Raw'}")
+                    #ax.legend(loc='upper right', fontsize='small')
+                    #ax.set_xlabel("Time point")
+                    #ax.set_ylabel("Value")
+
+                y_min = min(all_y_values)
+                y_max = max(all_y_values)
+                offset = abs((y_max-y_min))/5
+                for ax in axes:
+                    ax.set_ylim(y_min-offset, y_max+offset)
+
+                fig.suptitle(f"{ext_part_id} ({pain_group}), {target}, {axis}: Mean over Time by key pairs", fontsize=16)
+                #ax.set_title(f"{target}, {axis}: Mean over Time by key pairs per group", fontsize=14)
+
+                #ax.legend(loc='upper right')
+                fig.tight_layout()
+                
+                target_str = target.replace(" ", "_")
+                # Save plot
+                output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "keys_per_participant" / f"{target_str}_{axis}" 
+                output_path.mkdir(parents=True, exist_ok=True)
+                self.data_plotter.save_plot(fig, output_path, f"Part_{ext_part_id}_{measurement_tp}_Key_Mean_{target}_{axis}")

@@ -1,7 +1,6 @@
 from core.run_pca import PCARunner
 from core.run_general_analysis import GeneralAnalysisRunner
 def main():
-    # TODO: plot mean/std for one participant -> with the new key controlled features!
     pca_analysis_completed = False
     pca_uploads_completed = []
     #pca_uploads_completed = [(1,'pre','mocap')]
@@ -12,14 +11,16 @@ def main():
     measurement_tp = 'pre'
     device = 'mocap'
     rotation_method = 'varimax'
-    pain_groups = ["healthy", "shoulder_neck"]
+    #pain_groups = ["healthy", "shoulder_neck"]
+    pain_groups = ["all"]
     
     pca_runner = PCARunner()
     general_analysis_runner = GeneralAnalysisRunner()
     
-    #general_analysis_runner.create_plots_key_per_group(device, exp_id, measurement_tp, pain_groups)
-    #general_analysis_runner.create_plots_mean_std_keys(device, exp_id, measurement_tp, pain_groups)
-    general_analysis_runner.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups, True)
+    general_analysis_runner.create_plots_key_per_group(device, exp_id, measurement_tp, pain_groups)
+    general_analysis_runner.create_plots_mean_std_keys(device, exp_id, measurement_tp, pain_groups)
+    general_analysis_runner.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups)
+    general_analysis_runner.create_plots_key_per_participant(device, exp_id, measurement_tp, pain_groups)
     
     if ((exp_id, measurement_tp, device) not in pca_uploads_completed):
         pca_results = pca_runner.run_pca_analysis(exp_id, measurement_tp, device, pain_groups, check_requirements=True)

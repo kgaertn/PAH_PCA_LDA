@@ -32,7 +32,7 @@ class PCARunner:
             df_sorted, df_sorted_transformed  = self.load_data_for_pca(exp_id, device,measurement_tp, target, axis, participant_ids)
             df_transformed = self.process_data_for_pca(df_sorted)
             df_outliers_removed, count_outliers = self.check_and_remove_outliers(df_transformed)
-            
+            print(f"{target} {axis} Outliers (after key norm): {count_outliers}\t")
             df_part, df_pca = df_outliers_removed.iloc[:, :-202], df_outliers_removed.iloc[:, -202:]
             measurement_type_id = int(df_transformed['measurement_type_id'].unique()[0])
             if check_requirements:
@@ -44,6 +44,10 @@ class PCARunner:
                 #output_path = current_path / "output" / "plots"
                 #output_path = current_path / "output" / "plots" / "Correlation_matrix"
                 #self.data_plotter.save_plot(fig_corr_mat, output_path, f"Original_Data_Correlation_matrix_{target}_{axis}")
+                
+                key_cont_corr_mat = self.assumptions_tester.check_pca_requirements(df_transformed.iloc[:, -202:], target, axis)
+                #key_cont_fig_corr_mat = self.assumptions_tester.plot_pca_requirements(key_cont_corr_mat, target, axis)
+                #self.data_plotter.save_plot(key_cont_fig_corr_mat, output_path, f"Mean_Subt_Data_Correlation_matrix_{target}_{axis}")
             if scale_data:
                 df_analysis, scaler_info = self.scale_df(df_pca, scaler_type)
                 scaler, existing_scaler_info = self.data_loader.load_specific_scaler(measurement_type_id, scaler_type)
@@ -195,7 +199,7 @@ class PCARunner:
         # subtract the key mean-waveform from each sample
         # TODO: save mean key per target/axis? / plot mean key? 
         #df_key_normalized, df_mean_key_waveform_target_axis = self.data_processor.subtract_meanwave_key(df_sorted)
-        df_key_normalized, df_mean_key_waveform_target_axis = self.data_processor.subtract_meanwave_key_difference(df_sorted)
+        df_key_normalized = self.data_processor.subtract_meanwave_key_difference(df_sorted)
         # transform the data (columns for each timepoint)
         df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_key_normalized, 'value_centered','dp_time_point')
         return df_transformed
@@ -247,7 +251,9 @@ class PCARunner:
                     'measurement_id','measurement_type_id', 'target', 'axis', 'sample_id', 'bow_stroke', 'up_down', 'key', 'dp_time_point',
                     'value'
                 ]]
-            df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_reduced, 'value', 'dp_time_point')
+            df_keynorm = self.data_processor.subtract_meanwave_key_difference(df_reduced)
+            df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_keynorm, 'value', 'dp_time_point')
+            
             scaler, _ = self.data_loader.load_specific_scaler(measurement_type_id, scaler_type)
             #scaler = StandardScaler()
             #scaler.mean_ = scaler_info.mean
@@ -286,7 +292,7 @@ class PCARunner:
         existing_target_axes = pca_df[['target', 'axis']].drop_duplicates().values.tolist()
         total_rotation_info = {}
         for target, axis in existing_target_axes:
-            participant_ids, pain_group_ids = self.get_participants_pain_groups(pain_groups)
+            participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df_target_axis = pca_df[(pca_df['target'] == target) & (pca_df['axis'] == axis)]
             loading_vector_json = df_target_axis['loading_vector'].drop_duplicates().values
             loading_vectors = []
