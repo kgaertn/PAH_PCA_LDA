@@ -2,44 +2,54 @@ from pathlib import Path
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-#plt.rcParams['axes.prop_cycle'] = plt.cycler(color=['#8CB369', '#BC4B51', '#5B8E7D', '#F4A259'])
+from pandas.plotting import scatter_matrix
+from pandas.plotting import lag_plot
+import matplotlib.figure
 import seaborn as sns
 import pandas as pd
 import numpy as np
-
-
 
 class DataPlotter:
     
     def __init__(self):
         """
-        Initializes the PCA_Analyser with a data processor.
-        """   
+        Initialize DataPlotter with predefined color map.
+        """    
         self.COLOR_MAP = {
-        "pain": "#BC4B51",      # Blau
-        "no_pain": "#8CB369",   # Orange
-        "loading": "#5B8E7D",   # Grün
+        "pain": "#BC4B51",
+        "no_pain": "#8CB369",
+        "loading": "#5B8E7D",   
 } 
         
-    def save_distribution_plot(self, fig, target, axis, pc_index, meas_time_point):
+    def save_distribution_plot(self, fig:matplotlib.figure.Figure, target:str, axis:str, pc_index:int, meas_time_point:str):
+        """
+        Save histogram plot to output folder and close it.
+
+        Args:
+            fig (matplotlib.figure.Figure): Figure to save.
+            target (str): Target label.
+            axis (str): Axis label.
+            pc_index (int): Principal component index.
+            meas_time_point (str): Measurement time point.
+        """
         current_path = Path.cwd()
         output_path = current_path / "output" / "plots" / "Histograms"
         self.save_plot(fig, output_path, f"{meas_time_point}_PC_Scores_Histogram_{target}_{axis}_PC_{pc_index}")
         plt.close()
         
-        
-    def plot_PCA_reconstruction_per_group(self,component_data, title_waveform="Mean Waveform", title_loading="Loading Vector"):
+    def plot_PCA_reconstruction_per_group(self,component_data:dict, title_waveform:str = "Mean Waveform", 
+                                          title_loading:str ="Loading Vector") -> matplotlib.figure.Figure:
         """
         Plots the reconstructed mean waveforms with percentile bands and the corresponding 
-        loading vector of a PCA component.
+        loading vector of a PCA component per participant group.
 
         Args:
-            component_data (dict): Output dictionary from a reconstruction method containing waveform and PCA info.
-            title_waveform (str): Title for the mean waveform plot.
-            title_loading (str): Title for the loading vector plot.
+            component_data (dict): Reconstruction data with waveforms and loadings.
+            title_waveform (str): Title for waveform plot.
+            title_loading (str): Title for loading plot.
 
         Returns:
-            tuple[matplotlib.figure.Figure, list[matplotlib.axes._axes.Axes]]: The figure and axes objects for further customization or saving.
+            tuple: Matplotlib figure and axes.
         """
         
         mean_waveform_pain = component_data['mean_waveform_pain']
@@ -87,8 +97,16 @@ class DataPlotter:
 
         return fig
     
-
     def get_color_for_label(self, label: str) -> str:
+        """
+        Return color code based on label content.
+
+        Args:
+            label (str): Label string.
+
+        Returns:
+            str: Hex color code.
+        """
         label_lower = label.lower()
         if "no pain" in label_lower or "no_pain" in label_lower:
             return self.COLOR_MAP["no_pain"]
@@ -96,68 +114,21 @@ class DataPlotter:
             return self.COLOR_MAP["pain"]
         elif "load" in label_lower:
             return self.COLOR_MAP["loading"]
-        return "#000000"  # Fallback: Schwarz
+        return "#000000"
 
-    #@staticmethod
-    #def plot_PCA_reconstruction_per_group(component_data, title_waveform="Mean Waveform", title_loading="Loading Vector"):
-    #    """
-    #    Plots the reconstructed mean waveforms with percentile bands and the corresponding 
-    #    loading vector of a PCA component.
-#
-    #    Args:
-    #        component_data (dict): Output dictionary from a reconstruction method containing waveform and PCA info.
-    #        title_waveform (str): Title for the mean waveform plot.
-    #        title_loading (str): Title for the loading vector plot.
-#
-    #    Returns:
-    #        tuple[matplotlib.figure.Figure, list[matplotlib.axes._axes.Axes]]: The figure and axes objects for further customization or saving.
-    #    """
-    #    
-    #    mean_waveform_pain = component_data['mean_waveform_pain']
-    #    mean_waveform_no_pain = component_data['mean_waveform_no_pain']
-    #    lower_band_pain = component_data['lower_band_pain']
-    #    upper_band_pain = component_data['upper_band_pain']
-    #    lower_band_nopain = component_data['lower_band_no_pain']
-    #    upper_band_nopain = component_data['upper_band_no_pain']
-    #    loading_vector = component_data['loading_vector']
-    #    
-    #    fig, axs = plt.subplots(2, 1, figsize=(10, 8))
-    #
-    #    # Plot mean waveforms
-    #    axs[0].plot(mean_waveform_pain, label="Pain", color="blue")
-    #    axs[0].plot(mean_waveform_no_pain, label="No Pain", color="orange")
-    #    axs[0].plot(lower_band_pain, label="Lower Band Pain", linestyle='--', color="blue", alpha = 0.5)
-    #    axs[0].plot(upper_band_pain, label="Upper Band Pain", linestyle=':', color="blue", alpha = 0.5)
-    #    axs[0].plot(lower_band_nopain, label="Lower Band No Pain", linestyle='--', color="orange", alpha = 0.5)
-    #    axs[0].plot(upper_band_nopain, label="Upper Band No Pain", linestyle=':', color="orange", alpha = 0.5)
-    #    
-    #    axs[0].set_title(title_waveform)
-    #    axs[0].set_xlabel("Normalized time (%)")
-    #    axs[0].set_ylabel("Amplitude (°)")
-    #    axs[0].legend(loc='upper right')
-    #    axs[0].grid(True)
-    #    
-    #    # Plot loading vector
-    #    axs[1].plot(loading_vector, color="green")
-    #    axs[1].set_title(title_loading)
-    #    axs[1].set_xlabel("Component Index")
-    #    axs[1].set_ylabel("Loading Value")
-    #    axs[1].grid(True)
-    #    
-    #    return fig 
-
-    def plot_PCA_reconstruction(self, component_data, title_waveform="Mean Waveform", title_loading="Loading Vector"):
+    def plot_PCA_reconstruction(self, component_data:dict, title_waveform:str="Mean Waveform", 
+                                title_loading:str="Loading Vector") -> matplotlib.figure.Figure:
         """
         Plots the reconstructed mean waveforms with percentile bands and the corresponding 
         loading vector of a PCA component.
 
         Args:
-            component_data (dict): Output dictionary from a reconstruction method containing waveform and PCA info.
-            title_waveform (str): Title for the mean waveform plot.
-            title_loading (str): Title for the loading vector plot.
+        component_data (dict): Reconstruction output containing mean waveforms, bands, and loading vector.
+        title_waveform (str): Title for the waveform subplot.
+        title_loading (str): Title for the loading vector subplot.
 
         Returns:
-            tuple[matplotlib.figure.Figure, list[matplotlib.axes._axes.Axes]]: The figure and axes objects for further customization or saving.
+            matplotlib.figure.Figure: The figure object containing the plots.
         """
         
         mean_waveform_pain = component_data['mean_waveform_pain']
@@ -209,36 +180,40 @@ class DataPlotter:
         return fig       
     
     @staticmethod
-    def save_plot(fig, file_path, filename, dpi=300, file_format='png'):
+    def save_plot(fig:matplotlib.figure.Figure, file_path:Path, filename:str, dpi:int=300, file_format:str='png'):
         """
-        Saves a matplotlib figure to file.
+        Saves a matplotlib figure to a specified file path with given resolution and format.
 
-        Parameters:
-            fig (matplotlib.figure.Figure): The figure object to save.
-            filename (str): Path or filename without extension.
-            dpi (int): Resolution in dots per inch.
-            file_format (str): File format, e.g. 'png', 'pdf', 'svg', etc.
-
-        Returns:
-            None
+        Args:
+            fig (matplotlib.figure.Figure): Figure object to save.
+            file_path (Path): Directory path where the file will be saved.
+            filename (str): Name of the file without extension.
+            dpi (int, optional): Resolution in dots per inch. Defaults to 300.
+            file_format (str, optional): File format (e.g., 'png', 'pdf'). Defaults to 'png'.
         """
         full_filename = f"{filename}.{file_format}"
         fig.savefig(str(file_path) +'\\' + full_filename, dpi=dpi, format=file_format, bbox_inches='tight')
         plt.close()
         print(f"Plot saved to {full_filename}")
     
- 
-    def plot_distribution(self, df, column, target, axis, pc_index, meas_time_point, kind='hist', bins=10, **kwargs):
+    def plot_distribution(self, df:pd.DataFrame, column:str, target:str, axis:str, pc_index:int, meas_time_point:str, 
+                          kind:str='hist', bins:int=10, **kwargs) -> matplotlib.figure.Figure:
         """
-        Plot the distribution of a DataFrame column for pain and no-pain groups as two subplots.
+        Plots the distribution of a DataFrame column separately for pain and no-pain groups.
 
-        Parameters:
-        - df: pandas DataFrame
-        - column: str, column name to plot
-        - target, axis, pc_index, meas_time_point: str/int, metadata for title
-        - kind: 'hist' for histogram, 'kde' for density plot
-        - bins: int, number of bins (used for histogram)
-        - **kwargs: additional keyword arguments for plot customization
+        Args:
+            df (pandas.DataFrame): Input data containing scores and group labels.
+            column (str): Column name to plot.
+            target (str): Target descriptor for plot title.
+            axis (str): Axis descriptor for plot title.
+            pc_index (int): Principal component index for title.
+            meas_time_point (str): Measurement time point for title.
+            kind (str, optional): Type of plot, 'hist' for histogram or 'kde' for density. Defaults to 'hist'.
+            bins (int, optional): Number of bins for histogram. Defaults to 10.
+            **kwargs: Additional plotting keyword arguments.
+
+        Returns:
+            matplotlib.figure.Figure: Figure object with the two distribution subplots.
         """
 
         df_pain = df[df['PRMD_ever'] == 1]
@@ -297,40 +272,19 @@ class DataPlotter:
 
         fig.suptitle(f'{kind.upper()} of PC Scores ({meas_time_point}): {target}, {axis}, PC {pc_index}')
         return fig
-            
-    #@staticmethod    
-    #def plot_distribution(df, column,target, axis, pc_index, meas_time_point, kind='hist', bins=10, **kwargs):
-    #    """
-    #    Plot the distribution of a DataFrame column.
-#
-    #    Parameters:
-    #    - df: pandas DataFrame
-    #    - column: str, column name to plot
-    #    - kind: 'hist' for histogram, 'kde' for density plot
-    #    - bins: int, number of bins (used for histogram)
-    #    - **kwargs: additional keyword arguments for plot customization
-    #    """
-    #    fig, ax = plt.subplots(constrained_layout=True)
-    #    df_pain = df[df['PRMD_ever']==1]
-    #    df_nopain = df[df['PRMD_ever']==0]
-    #    if kind == 'hist':
-    #        df.plot(kind='hist', bins=bins, edgecolor='black', ax = ax, **kwargs)
-    #        plt.xlabel(column)
-    #        plt.ylabel('Frequency')
-    #        plt.title(f'Histogram of PC Scores ({meas_time_point}): {target}, {axis}, PC {pc_index}')
-    #    elif kind == 'kde':
-    #        df.plot(kind='kde', ax = ax, **kwargs)
-    #        plt.xlabel(column)
-    #        plt.ylabel('Density')
-    #        plt.title(f'KDE of PC Scores: {target}, {axis}, PC {pc_index}')
-    #    else:
-    #        raise ValueError("kind must be 'hist' or 'kde'")
-    #    return fig
     
     @staticmethod
-    def plot_linearity(df, fig_title):
-        from pandas.plotting import scatter_matrix
-        from pandas.plotting import lag_plot
+    def plot_linearity(df:pd.DataFrame, fig_title:str) -> tuple[matplotlib.figure.Figure, matplotlib.figure.Figure]:
+        """
+        Plots a scatter matrix of selected timepoints and a lag plot for all participants.
+
+        Args:
+            df (pd.DataFrame): DataFrame with participant data.
+            fig_title (str): Title for the plots.
+
+        Returns:
+            tuple[Figure, Figure]: Scatter matrix figure and lag plot figure.
+        """
         subset = df.iloc[:, -202::20]
         fig1 = plt.figure(figsize=(12, 12))
         scatter_matrix(subset, ax=fig1.add_subplot(111))
@@ -351,7 +305,18 @@ class DataPlotter:
         return fig1, fig2
 
     @staticmethod    
-    def plot_corr_matrix(corr_matrix, target, axis):
+    def plot_corr_matrix(corr_matrix:pd.DataFrame, target:str, axis:str) -> matplotlib.figure.Figure:
+        """
+        Plots a correlation matrix heatmap.
+
+        Args:
+            corr_matrix (pd.DataFrame): Correlation matrix.
+            target (str): Target label for title.
+            axis (str): Axis label for title.
+
+        Returns:
+            matplotlib.figure.Figure: Heatmap figure.
+        """
         fig = plt.figure(figsize=(10, 8))
         annotate = corr_matrix.shape[0] <= 20
         sns.heatmap(corr_matrix, annot=annotate, fmt=".2f",vmin=0, vmax=1, cmap='coolwarm', square=True)
@@ -359,20 +324,23 @@ class DataPlotter:
         return fig
     
     @staticmethod
-    def plot_mean_std(df, time_col='dp_timepoint', value_cols=None, title='Mean and Std Dev over Time'):
+    def plot_mean_std(df:pd.DataFrame, time_col:str='dp_timepoint', value_cols:list[str] | None = None, 
+                      title:str ='Mean and Std Dev over Time') -> matplotlib.figure.Figure:
         """
-        Plots the mean and standard deviation of time series data.
+        Plots mean and standard deviation of time series data.
 
-        Parameters:
-        - df: pandas DataFrame containing the data
-        - time_col: name of the column with time values
-        - value_cols: list of column names with measurements; if None, all except time_col are used
-        - title: title of the plot
+        Args:
+            df (pd.DataFrame): Input data.
+            time_col (str): Column with time values.
+            value_cols (list[str] | None): Measurement columns; all except time_col if None.
+            title (str): Plot title.
+
+        Returns:
+            matplotlib.figure.Figure: Mean ± std plot figure.
         """
         if value_cols is None:
             value_cols = [col for col in df.columns if col != time_col]
 
-        # Group by time in case there are multiple measurements per timestamp
         grouped = df.groupby(time_col)[value_cols]
 
         mean_series = grouped.mean()
@@ -394,16 +362,21 @@ class DataPlotter:
         plt.grid(True)
         plt.tight_layout()
  
-    def plot_mean_std_by_group(self,df, time_col='dp_time_point', value_cols=None, group_col=None, title='Mean and Std Dev over Time by Group'):
+    def plot_mean_std_by_group(self, df:pd.DataFrame, time_col:str='dp_timepoint', value_cols:list[str] | None = None, 
+                               group_col:list[str] | None =None, title:str='Mean and Std Dev over Time by Group'
+                               ) -> matplotlib.figure.Figure:
         """
-        Plots the mean and standard deviation of time series data for one or more groups.
+        Plots mean and standard deviation of time series data for each group.
 
-        Parameters:
-        - df: pandas DataFrame
-        - time_col: name of the time column
-        - value_cols: list of measurement columns; if None, all except time_col and group_col are used
-        - group_col: column to group data by (e.g., 'group' or 'condition')
-        - title: title of the plot
+        Args:
+            df (pd.DataFrame): Input data.
+            time_col (str): Column with time values.
+            value_cols (list[str] | None): Measurement columns; inferred if None.
+            group_col (str | None): Column to group by.
+            title (str): Plot title.
+
+        Returns:
+            matplotlib.figure.Figure: Grouped mean ± std plot figure.
         """
         # Determine which value columns to use
         exclude_cols = [time_col]

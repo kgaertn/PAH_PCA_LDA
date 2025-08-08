@@ -1,8 +1,7 @@
-from dataclasses import dataclass, field
-from typing import List, Optional
-import json
+from dataclasses import dataclass
 
 @dataclass
 class RotationPCA:
+    """Represents PCA rotation metadata."""
     id: int
     rotation_type: str

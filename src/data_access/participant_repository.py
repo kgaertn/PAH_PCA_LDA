@@ -1,33 +1,40 @@
-import pandas as pd
-from db.connection import get_connection
 from data_access.base_repository import BaseRepository
 from models.participant import Participant
 
 class ParticipantRepository(BaseRepository):
     def __init__(self):
         """
-        Initializes the ParticipantRepository with a database connection.
+        Initializes the ParticipantRepository with a database connection by calling the parent constructor.
         """
         super().__init__()
-        #self.conn = get_connection()
 
 # region Setter
+    def insert_participant(self, participant: Participant) -> int:
+        """
+        Inserts a new participant record into the 'participant' table.
 
-    def insert_participant(self, participant: Participant):
+        Args:
+            participant (Participant): The Participant model instance to insert.
+
+        Returns:
+            int: The ID of the newly inserted participant record.
+        """
         data = {
             "experiment_id": participant.experiment_id,
             "participant_id": participant.participant_id,
         }
         return self.insert_one("participant", data)
 
-    def update_pain_data(self, participant: Participant, exp_id):
+    def update_pain_data(self, participant: Participant, exp_id:int):
         """
-        Beispiel mit der generischen Update-Funktion.
-        Setzt sample_id, wo measurement_id = meas_id und bow_stroke IN (bow_stroke_start, bow_stroke_end).
+        Updates pain-related data fields for a participant in the database.
 
-        Da IN mit mehreren Werten nicht unterstützt ist, lösen wir das mit zwei OR Bedingungen oder zwei Updates.
-        Hier als einfache Variante zwei Updates:
+        This method uses a generic update function to set several PRMD pain columns
+        for the participant identified by experiment_id and participant_id.
 
+        Args:
+            participant (Participant): The Participant instance containing updated pain data.
+            exp_id (int): The experiment ID to which the participant belongs.
         """
         self.update(
             table="participant",
@@ -36,50 +43,19 @@ class ParticipantRepository(BaseRepository):
                     "PRMD_upper_arm_left":participant.PRMD_upper_arm_left, "PRMD_ever":participant.PRMD_ever},
             where={"experiment_id": exp_id, "participant_id": participant.participant_id}
         )
-
-    #def update_pain_data(self, participant: Participant, exp_id):
-    #    """
-    #    Updates pain-related fields for a specific participant in a given experiment.
-#
-    #    Args:
-    #        participant (Participant): A Participant object containing the pain data fields to update:
-    #            - instrument
-    #            - PRMD_shoulder_neck_right
-    #            - PRMD_shoulder_neck_left
-    #            - PRMD_upper_arm_right
-    #            - PRMD_upper_arm_left
-    #            - PRMD_ever
-    #            and the participant identifier (`participant_id`).
-    #        exp_id (int): The ID of the experiment the participant belongs to.
-#
-    #    Returns:
-    #        None
-    #    """
-    #    
-    #    cursor = self.conn.cursor()
-    #    cursor.execute("""
-    #        UPDATE participant
-    #        SET instrument = ?, PRMD_shoulder_neck_right = ?, PRMD_shoulder_neck_left = ?, 
-    #        PRMD_upper_arm_right = ?, PRMD_upper_arm_left = ?, PRMD_ever = ?
-    #        WHERE experiment_id = ? AND participant_id = ?
-    #    """, (participant.instrument, participant.PRMD_shoulder_neck_right, participant.PRMD_shoulder_neck_left,
-    #          participant.PRMD_upper_arm_right, participant.PRMD_upper_arm_left, participant.PRMD_ever,
-    #          exp_id, participant.participant_id))
-    #    self.conn.commit()        
+      
 # endregion Setter
 
 #region Getter
-# use these functions to access data from the participant table, depending on the needs
-
     def get_participant_ids(self, exp_id: int) -> list[str] | None:
         """
-        Retrieves all unique participant identifiers (e.g., 'P001', 'P002') for a given experiment.
+        Retrieves all unique participant IDs for a given experiment.
 
         Args:
-            exp_id (int): The ID of the experiment.
+            exp_id (int): The experiment ID.
 
         Returns:
-            list[str] | None: A list of participant IDs if any exist, otherwise None.
+            list[str] | None: List of participant IDs if found, otherwise None.
         """
         rows = self.get_advanced(
             table_or_view="participant",
@@ -92,15 +68,14 @@ class ParticipantRepository(BaseRepository):
     
     def get_participant_db_id(self, participant_id: str, exp_id: int) -> int | None:
         """
-        Retrieves the internal database ID of a participant using their participant ID
-        (e.g., 'P001') and the associated experiment ID.
+        Retrieves the internal database ID of a participant given their "external" participant ID and experiment ID.
 
         Args:
-            participant_id (str): The participant ID (not the database ID).
-            exp_id (int): The ID of the experiment the participant belongs to.
+            participant_id (str): The participant's external ID (e.g., 'P001').
+            exp_id (int): The experiment ID.
 
         Returns:
-            int | None: The internal database ID of the participant if found, otherwise None.
+            int | None: Internal database ID of the participant, or None if not found.
         """
         rows = self.get_advanced(
             table_or_view="participant",
@@ -111,15 +86,27 @@ class ParticipantRepository(BaseRepository):
         )
         return rows[0][0] if rows else None
     
-    def get_participant_column_names(self):
+    def get_participant_column_names(self) -> list[str]:
+        """
+        Retrieves the list of column names in the 'participant' table.
+
+        Returns:
+            list[str]: List of column names.
+        """
         return self.get_column_names('participant')
     
     def get_pain_participants(self, pain_columns: list[str], pain: int) -> list[int] | None:
         """
-        Gibt eine Liste von Teilnehmer-IDs zurück, bei denen mindestens eine der angegebenen Schmerzspalten
-        den gewünschten Wert (0 oder 1) hat.
+        Returns a list of participant IDs where at least one of the specified pain columns
+        matches the given pain value (e.g., 0 or 1).
+
+        Args:
+            pain_columns (list[str]): List of column names related to pain.
+            pain (int): Desired pain value to filter by.
+
+        Returns:
+            list[int] | None: List of participant database IDs matching the criteria, or None.
         """
-        # OR-Filter mit gemeinsamem Wert
         or_filter = {col: pain for col in pain_columns}
         
         rows = self.select_with_or(
@@ -131,116 +118,4 @@ class ParticipantRepository(BaseRepository):
     
         return [row[0] for row in rows] if rows else None
     
-    #def get_pain_participants(self, pain_columns, pain: int) -> int | None:
-    #    """
-    #    Retrieves the internal database ID of a participant using their participant ID
-    #    (e.g., 'P001') and the associated experiment ID.
-#
-    #    Args:
-    #        participant_id (str): The participant ID (not the database ID).
-    #        exp_id (int): The ID of the experiment the participant belongs to.
-#
-    #    Returns:
-    #        int | None: The internal database ID of the participant if found, otherwise None.
-    #    """
-    #    rows = self.get_advanced(
-    #        table_or_view="participant",
-    #        pain_columns = pain,
-    #        columns=["id"],
-    #        return_df=False
-    #    )
-    #    return rows[0][0] if rows else None
-    
-    #def get_participants_by_exp_name(self, exp_name: str) -> pd.DataFrame:
-    #    """
-    #    Retrieves all participants associated with a given experiment name,
-    #    including experiment metadata such as name and data state.
-#
-    #    Args:
-    #        exp_name (str): The name of the experiment.
-#
-    #    Returns:
-    #        pd.DataFrame: A DataFrame containing participant data joined with experiment info.
-    #    """
-    #    cursor = self.conn.cursor()
-    #    query = """
-    #        SELECT 
-    #            participant.*, 
-    #            experiment.name AS experiment_name,
-    #            experiment.data_state AS experiment_data_state
-    #        FROM participant
-    #        JOIN experiment ON participant.experiment_id = experiment.id
-    #        WHERE experiment.name = ?
-    #    """
-    #    cursor.execute(query, (exp_name.lower(),))
-    #    rows = cursor.fetchall()
-#
-    #    if not rows:
-    #        return pd.DataFrame()
-#
-    #    columns = [desc[0] for desc in cursor.description]
-    #    return pd.DataFrame(rows, columns=columns)     
-    # 
-    #def get_participant_by_id(self, participant_id: int) -> Participant | None:
-    #    """
-    #    Retrieves a participant by their internal database ID.
-#
-    #    Args:
-    #        participant_id (int): The internal database ID of the participant.
-#
-    #    Returns:
-    #        Participant | None: A Participant object if found, otherwise None.
-    #    """
-    #    cursor = self.conn.cursor()
-    #    cursor.execute("SELECT * FROM participant WHERE id = ?", (participant_id,))
-    #    row = cursor.fetchone()
-    #    if row:
-    #        # currently does not retrieve age, height, etc., as this information is currently not stored in the DB
-    #        return Participant(id=row["id"], participant_id=row["participant_id"], 
-    #                           experiment_id=row["experiment_id"], instrument= row["instrument"], 
-    #                           PRMD_shoulder_neck_right=row["PRMD_shoulder_neck_right"],
-    #                           PRMD_shoulder_neck_left=row["PRMD_shoulder_neck_left"],
-    #                           PRMD_upper_arm_right=row["PRMD_upper_arm_right"],
-    #                           PRMD_upper_arm_left=row["PRMD_upper_arm_left"],
-    #                           PRMD_ever=row["PRMD_ever"],)
-    #    return None
-#
-    #def get_participant_db_id(self, participant_id: int, exp_id: int) -> Participant | None:
-    #    """
-    #    Retrieves the internal database ID of a participant using their participant ID
-    #    (e.g., 'P001') and the associated experiment ID.
-#
-    #    Args:
-    #        participant_id (str): The participant ID (not the database ID).
-    #        exp_id (int): The ID of the experiment the participant belongs to.
-#
-    #    Returns:
-    #        int | None: The internal database ID of the participant if found, otherwise None.
-    #    """
-    #    
-    #    cursor = self.conn.cursor()
-    #    cursor.execute("SELECT id FROM participant WHERE participant_id = ? AND experiment_id = ?", 
-    #                   (participant_id, exp_id))
-    #    row = cursor.fetchone()
-    #    if row:
-    #        return row[0]
-    #    return None
-    #
-    #def get_participant_ids(self, exp_id: int) -> Participant | None:
-    #    """
-    #    Retrieves all unique participant identifiers (e.g., 'P001', 'P002') for a given experiment.
-#
-    #    Args:
-    #        exp_id (int): The ID of the experiment.
-#
-    #    Returns:
-    #        list[str] | None: A list of participant IDs if any exist, otherwise None.
-    #    """
-    #    
-    #    cursor = self.conn.cursor()
-    #    cursor.execute("SELECT DISTINCT participant_id FROM participant WHERE experiment_id = ?", (exp_id,))
-    #    rows = cursor.fetchall()
-    #    if rows:
-    #        return [row[0] for row in rows]
-    #    return None
 #endregion Getter

@@ -1,18 +1,37 @@
 from db.connection import get_connection
 
 def db_setup():
+    """
+    Sets up the database by:
+    - Creating all necessary tables if they don't exist.
+    - Adding missing columns to the 'datapoint' table.
+    - Creating multiple database views for adjusted and aggregated data.
+    """
     create_tables()
     add_columns_if_missing('datapoint', new_columns = {'sample_id': 'INTEGER'})
     create_adjusted_view()
-    create_datapoints_MPA_view()
+    create_complete_datapoints_view()
     create_PCA_View()
 
 def add_measurement_type_info():
+    """
+    Updates the 'measurement_type' table and related tables by:
+    - Populating the measurement_type table with data from the measurement table.
+    - Updating measurement records with the corresponding measurement_type_id.
+    - Adding rotation sequence information based on target and axis data.
+    """
     fill_measurement_type_table()
     add_measurement_type_id_to_measurement()    
-    add_rotation_sequuence()    
+    add_rotation_sequence()    
 
 def create_tables():
+    """
+    Creates all required database tables if they do not already exist.
+    Includes all tables, such as experiment, participant, pain_group, measurement_type,
+    measurement, sample, datapoint, pcs_ranked, pc_scores, scaler, pca_rotation,
+    and pain group association tables.
+    """    
+    
     conn = get_connection()
     cursor = conn.cursor()
 
@@ -217,25 +236,21 @@ def create_tables():
 
     conn.commit()
 
-
-def add_columns_if_missing(table_name, new_columns):
+def add_columns_if_missing(table_name:str, new_columns:dict[str, str]):
     """
-    Adds new columns to an existing table if they don't already exist.
+    Adds new columns to an existing table if they are missing.
 
-    Parameters:
-    - connection: SQLite connection object
-    - table_name: Name of the table as string
-    - new_columns: Dict with column names as keys and SQL types as values
-                   e.g., {"new_col1": "TEXT", "new_col2": "INTEGER"}
+    Args:
+        table_name (str): The name of the table to modify.
+        new_columns (dict): A dictionary where keys are column names and values are SQL data types,
+                            e.g. {'sample_id': 'INTEGER'}.
     """
     conn = get_connection()
     cursor = conn.cursor()
 
-    # Get current column names
     cursor.execute(f"PRAGMA table_info({table_name})")
     existing_columns = {row[1] for row in cursor.fetchall()}
 
-    # Add missing columns
     for col_name, col_type in new_columns.items():
         if col_name not in existing_columns:
             alter_stmt = f"ALTER TABLE {table_name} ADD COLUMN {col_name} {col_type}"
@@ -247,6 +262,10 @@ def add_columns_if_missing(table_name, new_columns):
     conn.commit()
  
 def create_adjusted_view():
+    """
+    Creates the 'datapoint_adjusted' view that shifts timepoints by 101 units when up_down=1
+    and includes only datapoints with valid sample_id.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -266,10 +285,12 @@ def create_adjusted_view():
             FROM datapoint
             WHERE sample_id IS NOT NULL;
     """)
-    
- 
-def create_datapoints_MPA_view():
-    #TODO
+     
+def create_complete_datapoints_view():
+    """
+    Creates the 'Complete Data' view that combines experiment, participant, measurement,
+    and datapoint information and filters for valid rotation sequences.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -291,33 +312,11 @@ def create_datapoints_MPA_view():
             JOIN measurement_type mt ON m.measurement_type_id = mt.id
             WHERE mt.rotation_sequence NOT IN ('carrying_angle', 'redundant');
     """)
-
-#def create_datapoints_MPA_device_view(device_table_name:str, device:str):
-#    #TODO
-#    conn = get_connection()
-#    cursor = conn.cursor()
-#    cursor.execute(f"""
-#        CREATE VIEW IF NOT EXISTS "Datapoints MPA Clean {device_table_name}" AS
-#            SELECT
-#                e.id AS experiment_id, e.name,
-#                p.id AS participant_id, p.participant_id AS ext_participant_id, p.instrument, p.PRMD_shoulder_neck_right, 
-#                p.PRMD_shoulder_neck_left, p.PRMD_upper_arm_right, 
-#                p.PRMD_upper_arm_left, p.PRMD_ever,
-#                m.id AS measurement_id, m.measurement_type_id, m.timepoint, m.device,
-#                m.target, m.axis, m.unit,
-#                d.id AS dp_id, d.sample_id, d.bow_stroke, d.up_down,
-#                d.key, d.time_point AS dp_time_point, d.value
-#
-#            FROM experiment e
-#            JOIN participant p ON p.experiment_id = e.id
-#            JOIN measurement m ON m.participant_id = p.id
-#            JOIN datapoint_adjusted d ON d.measurement_id = m.id
-#            WHERE m.device = "{device}";
-#    """)
-    
     
 def create_PCA_View():
-    
+    """
+    Creates the 'Participants PCs' view combining PCA-related data with pain group and participant information.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute("""
@@ -376,7 +375,10 @@ def create_PCA_View():
     """)
 
 def fill_measurement_type_table():
-    #TODO
+    """
+    Inserts distinct combinations of experiment_id, device, timepoint, target, and axis from the
+    measurement table into the measurement_type table, ignoring duplicates.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(f"""
@@ -393,7 +395,10 @@ def fill_measurement_type_table():
     conn.commit()
     
 def add_measurement_type_id_to_measurement():
-    #TODO
+    """
+    Updates measurement records with a NULL measurement_type_id by assigning the matching measurement_type.id
+    based on experiment_id, device, timepoint, target, and axis.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(f"""
@@ -410,10 +415,13 @@ def add_measurement_type_id_to_measurement():
             )
             WHERE measurement_type_id IS NULL;
     """)
-    conn.commit()
-        
+    conn.commit()    
 
-def add_rotation_sequuence():
+def add_rotation_sequence():
+    """
+    Updates the rotation_sequence column in the measurement_type table based on predefined
+    target and axis combinations.
+    """
     conn = get_connection()
     cursor = conn.cursor()
     cursor.execute(f"""UPDATE measurement_type SET rotation_sequence = CASE
@@ -466,7 +474,8 @@ def add_rotation_sequuence():
     ELSE rotation_sequence 
 END;""")
     conn.commit()
-    
+
+# TODO: calculate the angular velocity    
 """SELECT 
     da.measurement_id,
     da.sample_id,
@@ -490,7 +499,6 @@ LEFT JOIN measurement meas ON
 WHERE meas.device = 'mocap' AND meas.timepoint = 'pre'
 ORDER BY da.measurement_id, da.sample_id, da.time_point;"""
         
-
 if __name__ == "__main__":
     create_tables()
     print("Database tables created.")

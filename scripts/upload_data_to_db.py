@@ -9,9 +9,11 @@ from data_access.experiment_repository import ExperimentRepository
 from db.setup import db_setup
 from db.setup import add_measurement_type_info
 
-
-
 def main():
+    """
+    Sets up the database, uploads clean MPA data and pain data, 
+    adds measurement type info, and creates processed samples.
+    """
     db_setup()
     print("Database tables created.")
     
@@ -34,7 +36,6 @@ def main():
     relative_path = uploader.get_relative_data_path_without_filename(clean_mpa_folder_mocap)
     uploaded_data = exp_repo.get_complete_data_folders()
     if uploaded_data == None or relative_path not in uploaded_data:
-        # all filepaths for clean mpa data
         data_folders = list(clean_mpa_folder_mocap.glob('*')) + list(clean_mpa_folder_emg.glob('*'))        
         uploader.upload(data_folders)
         

@@ -1,9 +1,10 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
 import json
 
 @dataclass
 class PC_Ranked:
+    """Represents a (ranked) principal component with related statistics."""
     id: int
     measurement_type_id: int
     scaler_id: Optional[int] = None
@@ -28,8 +29,10 @@ class PC_Ranked:
     shap_wilk_p_no_pain: Optional[float] = None
 
     def loading_vector_to_json(self) -> str:
+        """Return the loading vector as a JSON string."""
         return json.dumps(self.loading_vector)
         
     @staticmethod
     def list_from_json(json_str: str) -> List[float]:
+        """Convert a JSON string to a list of floats."""
         return json.loads(json_str)

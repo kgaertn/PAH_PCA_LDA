@@ -1,17 +1,24 @@
-import pandas as pd
-from db.connection import get_connection
 from data_access.base_repository import BaseRepository
 from models.pc_ranked import PC_Ranked
 
 class PCRankedRepository(BaseRepository):
     def __init__(self):
         """
-        Initializes the ExperimentRepository with a database connection.
+        Initializes the PCRankedRepository with a database connection by calling the parent constructor.
         """
         super().__init__()
 
 # region Setter
     def insert_new_pc(self, pc: PC_Ranked):
+        """
+        Inserts a new PC_Ranked record into the 'pcs_ranked' table.
+
+        Args:
+            pc (PC_Ranked): The PC_Ranked model instance to insert.
+
+        Returns:
+            int: The ID of the newly inserted record.
+        """
         data = {
             "measurement_type_id": pc.measurement_type_id,
             "parent_id":pc.parent_id,
@@ -25,11 +32,16 @@ class PCRankedRepository(BaseRepository):
         return self.insert_one("pcs_ranked", data)
 
     def update_multiple_t_test_info(self, t_test_results: list[PC_Ranked]):
+        """
+        Updates multiple PC records with t-test related statistics.
+
+        Args:
+            t_test_results (list[PC_Ranked]): List of PC_Ranked instances with updated t-test information.
+        """
         values = []
         for pc in t_test_results:
             values.append({
                 "id": pc.id,
-                #"rank": pc.rank,
                 "group_mean_pain": pc.group_mean_pain,
                 "group_mean_no_pain": pc.group_mean_no_pain,
                 "group_std_pain": pc.group_std_pain,
@@ -40,6 +52,12 @@ class PCRankedRepository(BaseRepository):
         self.update_many("pcs_ranked", values_list=values, where_keys=["id"])
  
     def update_pc_score_distribution_info(self, pc_distributions: list[PC_Ranked]):
+        """
+        Updates multiple PC records with distribution and Shapiro-Wilk test statistics.
+
+        Args:
+            pc_distributions (list[PC_Ranked]): List of PC_Ranked instances with updated distribution info.
+        """
         values = []
         for pc in pc_distributions:
             values.append({
@@ -52,10 +70,7 @@ class PCRankedRepository(BaseRepository):
             })
         self.update_many("pcs_ranked", values_list=values, where_keys=["id"])       
 
-
 # region Getter
-# use these functions to access data from the experiment table, depending on the needs
-# TODO
-
+# To be implemented
 
 # endregion Getter

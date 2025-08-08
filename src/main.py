@@ -1,6 +1,13 @@
 from core.run_pca import PCARunner
 from core.run_general_analysis import GeneralAnalysisRunner
+
 def main():
+    """
+    Runs the complete PCA and general analysis workflow, including:
+    - Generating summary plots.
+    - Performing PCA, rotations, and t-tests.
+    - Uploading analysis results.
+    """
     pca_analysis_completed = False
     pca_uploads_completed = []
     #pca_uploads_completed = [(1,'pre','mocap')]

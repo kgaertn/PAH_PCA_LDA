@@ -1,7 +1,6 @@
 from data_access.scaler_repo import ScalerRepository
 from data_access.pc_ranked_repository import PCRankedRepository
 from data_access.pc_scores_repository import PCScoresRepository
-#from data_access.experiment_repository import ExperimentRepository
 from data_access.participant_repository import ParticipantRepository
 from data_access.measurement_repository import MeasurementRepository
 from data_access.sample_repository import SampleRepository
@@ -11,6 +10,8 @@ from data_access.pain_group_repository import PainGroupRepository
 from models.scaler import Scaler
 from models.pc_ranked import PC_Ranked
 from models.pc_scores import PC_Scores
+from models.rotation import RotationPCA
+from models.pain_group import PainGroup
 
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
@@ -19,9 +20,8 @@ class DataLoader:
     
     def __init__(self):
         """
-        Initializes the PCA_Analyser with a data processor.
+        Initializes the DataLoader with repository instances.
         """    
-        #self.exp_repo = ExperimentRepository()
         self.part_repo = ParticipantRepository()
         self.meas_repo = MeasurementRepository()
         self.samp_repo = SampleRepository()
@@ -32,12 +32,28 @@ class DataLoader:
         self.rot_repo = RotationRepository()
         self.pain_group_repo = PainGroupRepository()
         
-    def upload_distribution_info(self, pc_distributions):
-        """"""
+    def upload_distribution_info(self, pc_distributions:list[PC_Ranked]):
+        """
+        Upload PC score distribution metadata.
+
+        Args:
+            pc_distributions (list[PC_Ranked]): A list of the ranked pcs and their distribution information.
+        """
         self.pc_ranked_repo.update_pc_score_distribution_info(pc_distributions)
         
-    def upload_scaler(self, meas_type_id, scaler_type, mean, scale):
-        """"""
+    def upload_scaler(self, meas_type_id:int, scaler_type:str, mean:list[float], scale:list[float]) -> int:
+        """
+        Save a scaler configuration to the database.
+
+        Args:
+            meas_type_id (int): ID of the measurement type.
+            scaler_type (str): Type of scaler used (e.g., 'standard').
+            mean (list[float]): Mean values used by the scaler.
+            scale (list[float]): Scale values used by the scaler.
+
+        Returns:
+            int: ID of the inserted scaler.
+    """
         scaler = Scaler(
             id = 1,
             measurement_type_id=meas_type_id,
@@ -48,8 +64,24 @@ class DataLoader:
         scaler_id = self.scaler_repo.insert_new_scaler(scaler)
         return scaler_id
     
-    def upload_pca(self, meas_type_id, parent_id, pc_index, loading_vector, explained_variance, data_scaled, scaler_id, rotation_id):
-        """"""
+    def upload_pca(self, meas_type_id:int, parent_id:int, pc_index:int, loading_vector:list[float], explained_variance:float, data_scaled:bool, 
+                   scaler_id:int | None, rotation_id:int | None) -> int:
+        """
+        Save PCA component metadata to the database.
+
+        Args:
+            meas_type_id (int): Measurement type ID.
+            parent_id (int): Parent PCA entity ID.
+            pc_index (int): Principal component index.
+            loading_vector (list[float]): Loadings of the component.
+            explained_variance (float): Variance explained by the component.
+            data_scaled (bool): Information on whether the data is scaled or not
+            scaler_id (int |None): ID of the associated scaler.
+            rotation_id (int |None): ID of the rotation type.
+
+        Returns:
+            int: ID of the inserted PCA record.
+        """
         pc = PC_Ranked(
             id = 1,
             measurement_type_id=meas_type_id,
@@ -64,8 +96,17 @@ class DataLoader:
         pc_id = self.pc_ranked_repo.insert_new_pc(pc)
         return pc_id
     
-    def upload_pc_scores(self, pc_id, sample_scores):
-        """"""
+    def upload_pc_scores(self, pc_id:int, sample_scores:dict):
+        """
+        Save PC scores for samples.
+
+        Args:
+            pc_id (int): ID of the principal component.
+            sample_scores (dict): List of (sample_id, score) pairs.
+
+        Returns:
+            None
+        """
         pc_scores = []
         for sample, score in sample_scores:
             pc_scores.append(PC_Scores(
@@ -76,25 +117,55 @@ class DataLoader:
             ))
         self.pc_scores_repo.insert_many_pc_scores(pc_scores)
         
-    def load_pc_data(self, exp_id, device, meas_timepoint, distribution_info = None):
+    def load_pc_data(self, exp_id:int, device:str, meas_timepoint:str, distribution_info:str | None = None) -> pd.DataFrame:
+        """
+        Load principal component scores for a given experiment, device, and measurement timepoint.
+
+        Args:
+            exp_id (int): Experiment ID
+            device (str): Device name (e.g., 'mocap')
+            meas_timepoint (str): Measurement timepoint (e.g., 'pre', 'post')
+            distribution_info (str | None): Optional filter for distribution information
+
+        Returns:
+            pd.DataFrame: DataFrame containing the principal component scores
+        """
         df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device, meas_timepoint, distribution_info)
         return df
     
-    def load_pcs_by_rank(self, exp_id, device, meas_tp, nr_components = None, select_rotated = False):
+    def load_pcs_by_rank(self, exp_id:int, device:str, meas_tp:str, nr_components:int | None = None, select_rotated:bool = False):
+        """
+        Load principal components ordered by rank, optionally selecting rotated components.
+
+        Args:
+            exp_id: Experiment ID
+            device: Device name
+            meas_tp: Measurement timepoint
+            nr_components (int | None): Number of components to load (optional)
+            select_rotated (bool): Whether to load rotated PCs (default False)
+
+        Returns:
+            pd.DataFrame: DataFrame of selected principal components
+        """
         if select_rotated:
             df = self.pc_scores_repo. get_rotated_pc_scores(exp_id, device, meas_tp, nr_components= nr_components)
         else:
             df = self.pc_scores_repo. get_unrotated_pc_scores(exp_id, device, meas_tp, nr_components= nr_components)
-        #df = self.pc_scores_repo.get_pc_scores_by_tp_rank(exp_id, device,meas_tp, nr_components)
         return df
     
-    def upload_t_test_results(self, df):
+    def upload_t_test_results(self, df:pd.DataFrame):
+        """
+        Upload t-test results from a DataFrame into the database.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing columns: pc_id, mean_pain, mean_no_pain,
+                            std_pain, std_no_pain, t_value, p_value
+        """
         t_test_results = []
         for idx, row in df.iterrows():
             t_test_results.append(PC_Ranked(
                 id = row['pc_id'],
                 measurement_type_id= 1,
-                #rank = idx + 1,
                 group_mean_pain=row['mean_pain'],
                 group_mean_no_pain=row['mean_no_pain'],
                 group_std_pain=row['std_pain'],
@@ -104,7 +175,17 @@ class DataLoader:
             ))
         self.pc_ranked_repo.update_multiple_t_test_info(t_test_results)
    
-    def load_specific_scaler(self, meas_type_id, scaler_type):
+    def load_specific_scaler(self, meas_type_id:int, scaler_type:str) -> tuple[StandardScaler | None, Scaler | None]:
+        """
+        Load a specific scaler from the database and return it as a sklearn StandardScaler object.
+
+        Args:
+            meas_type_id: Measurement type ID
+            scaler_type: Type of scaler (e.g., 'standard')
+
+        Returns:
+            tuple: (StandardScaler instance or None if not found, scaler information record)
+        """
         scaler_info = self.scaler_repo.get_scaler_by_meas_type_id_scaler_type(meas_type_id, scaler_type)  
         if scaler_info != None:  
             scaler = StandardScaler()
@@ -113,19 +194,18 @@ class DataLoader:
         else:
             scaler = None
         return scaler, scaler_info
-    
-    
-    def get_existing_target_axis_exp(self,experiment = 1, device = 'mocap', meas_time_point = 'pre'):
+        
+    def get_existing_target_axis_exp(self,experiment:int = 1, device:str = 'mocap', meas_time_point:str = 'pre') -> list[str, str]:
         """
-        Load and filter datapoints for a specific joint from the 'mocap' device
-        at the 'pre' timepoint of experiment ID 1.
+        Get existing target and axis pairs for a given experiment, device, and timepoint.
 
         Args:
-            joint (str): The name of the joint to retrieve data for.
+            experiment (int): Experiment ID.
+            device (str): Device name.
+            meas_time_point (str): Measurement timepoint.
 
         Returns:
-            pd.DataFrame: A filtered DataFrame containing selected columns relevant 
-            to the specified joint.
+            list: List of target-axis pairs.
         """
         target_axes = self.meas_repo.get_advanced(
             table_or_view = 'measurement_type',
@@ -138,81 +218,120 @@ class DataLoader:
             return_df=False )
         return target_axes  
     
-    def load_MPA_clean_data_by_device_tp_target_axis(self, exp_id, device:str, timepoint:str, target:str, axis:str = None, participant_ids:list[int] = None):
+    def clean_data_by_exp_device_tp_target_axis(self, exp_id:int, device:str, timepoint:str, target:str, axis:str | None = None, 
+                                                     participant_ids:list[int] | None = None):
         """
-        Load and filter datapoints for a specific joint from the 'mocap' device
-        at the 'pre' timepoint of experiment ID 1.
+        Load clean data filtered by exp_id, device, timepoint, target, axis, and participants.
 
         Args:
-            joint (str): The name of the joint to retrieve data for.
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            timepoint (str): Measurement timepoint.
+            target (str): Target joint or data point.
+            axis (str | None): Axis specification.
+            participant_ids (list[int] | None): List of participant IDs.
 
         Returns:
-            pd.DataFrame: A filtered DataFrame containing selected columns relevant 
-            to the specified joint.
-        """
+            pd.DataFrame: Filtered data.
+    """
         df = self.dp_repo.get(table_or_view="[Complete Data]", experiment_id = exp_id, device = device, timepoint = timepoint, 
                               target = target, axis = axis, participant_id = participant_ids)
         return df   
          
-    def load_MPA_clean_data_by_device_tp_target_axis_participants(self,exp_id, device:str, timepoint:str, target:str,  part_ids:list[int] = None, axis:str = None):
+    def load_clean_data_by_exp_device_tp_target_axis_participants(self,exp_id:int, device:str, timepoint:str, target:str,  
+                                                                  part_ids:list[int] = None, axis:str = None) -> pd.DataFrame:
         """
-        Load and filter datapoints for a specific joint from the 'mocap' device
-        at the 'pre' timepoint of experiment ID 1.
+        Load clean data filtered by exp_id, device, timepoint, target, axis, and participant IDs.
 
         Args:
-            joint (str): The name of the joint to retrieve data for.
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            timepoint (str): Measurement timepoint.
+            target (str): Target joint or data point.
+            part_ids (list[int] | None): Participant IDs.
+            axis (str | None): Axis specification.
 
         Returns:
-            pd.DataFrame: A filtered DataFrame containing selected columns relevant 
-            to the specified joint.
+            pd.DataFrame: Filtered data.
         """
         df = self.dp_repo.get(table_or_view="[Complete Data]",experiment_id = exp_id, device = device, timepoint = timepoint, 
                               target = target, axis = axis, participant_id = part_ids)
         return df   
     
-    def load_data_one_joint(self, exp_id, device, timepoint, target:str) -> pd.DataFrame:
+    def load_data_one_joint(self, exp_id:int, device:str, timepoint:str, target:str) -> pd.DataFrame:
         """
-        Load and filter datapoints for a specific joint from the 'mocap' device
-        at the 'pre' timepoint of experiment ID 1.
+        Load data for one joint filtered by experiment, device, timepoint, and target.
 
         Args:
-            joint (str): The name of the joint to retrieve data for.
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            timepoint (str): Measurement timepoint.
+            target (str): Target joint.
 
         Returns:
-            pd.DataFrame: A filtered DataFrame containing selected columns relevant 
-            to the specified joint.
+            pd.DataFrame: Filtered data with selected columns.
         """
         df = self.dp_repo.get(table_or_view="[Complete Data]",experiment_id = exp_id, device = device, timepoint = timepoint, 
                               target = target)
         df_reduced = df[['participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever', 'target', 'axis', 'bow_stroke', 'up_down', 'key', 'dp_time_point', 'value']]
         return df_reduced
     
-    def load_full_device_data(self, exp_id, device:str, timepoint) -> pd.DataFrame:
+    def load_full_device_data(self, exp_id:int, device:str, timepoint:str) -> pd.DataFrame:
         """
-        Load and filter all datapoints for a given device at the 'pre' timepoint
-        of experiment ID 1.
+        Load full device data filtered by experiment, device, and timepoint.
 
-        Args::
-            device (str): The name of the device to retrieve data from.
+        Args:
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            timepoint (str): Measurement timepoint.
 
         Returns:
-            pd.DataFrame: A filtered DataFrame containing selected columns relevant 
-            to the specified device.
+            pd.DataFrame: Filtered data with selected columns.
         """
         df = self.dp_repo.get(table_or_view="[Complete Data]", experiment_id = exp_id, device = device, timepoint = timepoint)
         df_reduced = df[['participant_id', 'PRMD_shoulder_neck_right','PRMD_shoulder_neck_left','PRMD_ever', 'target', 'axis', 'bow_stroke', 'up_down', 'key', 'dp_time_point', 'value']]
         return df_reduced
     
-    def load_existing_rotation_ids(self):
+    def load_existing_rotation_ids(self) -> list[RotationPCA]:
+        """
+        Load all existing rotation IDs.
+
+        Returns:
+            list | None: List of RotationPCA objects with rotation id and rotation type or None, if no rotation objects are found
+        """
         return self.rot_repo.get_existing_rotations()
     
-    def load_existing_pain_groups(self):
+    def load_existing_pain_groups(self) -> list[PainGroup] | None:
+        """
+        Load all existing pain groups.
+
+        Returns:
+            list | None: List of pain group objects, with pain group id and pain group name or None, if no pain groups are found
+        """
         return self.pain_group_repo.get_existing_pain_groups()
-        """"""
-    def load_participants_by_pain_group(self, pain_group_id):
+
+    def load_participants_by_pain_group(self, pain_group_id:int) -> list[int]:
+        """
+        Load participant IDs belonging to a pain group.
+
+        Args:
+            pain_group_id (int): Pain group ID.
+
+        Returns:
+            list[int]: List of participant IDs.
+        """
         return self.pain_group_repo.get_participant_ids_by_pain_group(pain_group_id)
     
-    def upload_new_pain_group(self, pain_group):
+    def upload_new_pain_group(self, pain_group:str) -> tuple[list[int], int]:
+        """
+        Upload a new pain group and return associated participant IDs and group ID.
+
+        Args:
+            pain_group (str): Name of the pain group.
+
+        Returns:
+            tuple[list[int], int]: Participant IDs and pain group ID.
+        """
         pain_group_id = self.pain_group_repo.insert_pain_group(pain_group)
         if pain_group == 'healthy':
             participant_ids = self.part_repo.get_pain_participants(['PRMD_ever'], 0)
@@ -226,12 +345,27 @@ class DataLoader:
             participant_ids = self.part_repo.get_pain_participants(pain_columns, 1)
         self.pain_group_repo.insert_participant_pain_groups(participant_ids, pain_group_id)
         return participant_ids, pain_group_id     
-        #print("")
     
-    def upload_pc_pain_group_ids(self,pc_id, pain_group_id):
+    def upload_pc_pain_group_ids(self,pc_id:int, pain_group_id:int):
+        """
+        Associate a PC with a pain group.
+
+        Args:
+            pc_id (int): Principal component ID.
+            pain_group_id (int): Pain group ID.
+        """
         self.pain_group_repo.insert_pc_pain_group(pc_id, pain_group_id)
         
-    def upload_new_rotation_type(self, rotation_type):
+    def upload_new_rotation_type(self, rotation_type:str) -> int | None:
+        """
+        Upload a new rotation type if not existing, otherwise return existing ID.
+
+        Args:
+            rotation_type (str): Rotation type name.
+
+        Returns:
+            int | None: Rotation type ID.
+        """
         existing_rotation_types = self.load_existing_rotation_types()        
         existing_rotation_type_names = [rt.rotation_type for rt in existing_rotation_types] if existing_rotation_types else set()        
         if rotation_type not in existing_rotation_type_names:
@@ -243,11 +377,25 @@ class DataLoader:
                 )
         return rotation_type_id
     
-    def load_existing_rotation_types(self):
+    def load_existing_rotation_types(self) -> list[RotationPCA]:
+        """
+        Load all existing rotation types.
+
+        Returns:
+            list: List of RotationPCA objects.
+        """
         return self.rot_repo.get_existing_rotations()
     
-    def get_participants_pain_groups(self, pain_groups):
-        """"""
+    def get_participants_pain_groups(self, pain_groups:list[str])-> tuple[list[int], list[int]]:
+        """
+        Retrieve or create pain groups and their participants.
+
+        Args:
+            pain_groups (list[str]): Names of the pain groups.
+
+        Returns:
+            tuple[list[int], list[int]]: Participant IDs and pain group IDs.
+        """
         existing_pain_groups = self.load_existing_pain_groups()        
         existing_group_names = [pg.pain_group for pg in existing_pain_groups] if existing_pain_groups else set()
         all_participant_ids = []

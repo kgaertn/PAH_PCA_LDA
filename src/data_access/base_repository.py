@@ -5,16 +5,21 @@ from db.connection import get_connection
 
 class BaseRepository:
     def __init__(self):
-        #self.table_or_view = table_or_view
-        self.conn = get_connection()
-
-    def insert_one(self, table: str, data: dict):
         """
-        Insert a single record into the specified table.
+        Initializes the Repository with a database connection.
+        """
+        self.conn = get_connection()
+# region Setter
+    def insert_one(self, table: str, data: dict) -> int:
+        """
+        Generic insert one method: Insert a single record into the specified table.
 
         Args:
-            table (str): The table name.
-            data (dict): A dictionary of column names and values.
+            table (str): Name of the table to insert into.
+            data (dict): Dictionary of column names and corresponding values to insert.
+
+        Returns:
+            int: The row ID of the inserted record.
         """
         cursor = self.conn.cursor()
         columns = ', '.join(data.keys())
@@ -25,16 +30,18 @@ class BaseRepository:
         self.conn.commit()
         return cursor.lastrowid
 
-    def insert_many(self, table: str, data_list: list[dict]):
+    def insert_many(self, table: str, data_list: list[dict]) -> None:
         """
-        Insert multiple records into the specified table in one batch.
+        Generic insert many method: Insert multiple records into the specified table in a batch operation.
 
         Args:
-            table (str): The table name.
-            data_list (list[dict]): A list of dicts representing rows to insert.
+            table (str): Name of the table to insert into.
+            data_list (list[dict]): List of dictionaries, each representing a row to insert.
+        Returns:
+            None : When data_list is empty
         """
         if not data_list:
-            return  # nothing to insert
+            return
 
         cursor = self.conn.cursor()
         columns = ', '.join(data_list[0].keys())
@@ -44,14 +51,14 @@ class BaseRepository:
         cursor.executemany(query, values_list)
         self.conn.commit()
     
-    def update(self, table: str, values: dict, where: dict):
+    def update(self, table: str, values: dict[str, any], where: dict[str, any]):
         """
-        Generic update function.
+        Generic update method: Update rows in the specified table matching the conditions.
 
         Args:
-            table (str): Table name to update.
-            values (dict): Columns and their new values to set.
-            where (dict): Conditions for the WHERE clause (column=value).
+            table (str): Name of the table to update.
+            values (dict): Dictionary of columns and their new values.
+            where (dict): Dictionary specifying the WHERE conditions (column-value pairs).
         """
         cursor = self.conn.cursor()
 
@@ -65,14 +72,17 @@ class BaseRepository:
         cursor.execute(query, params)
         self.conn.commit()
         
-    def update_many(self, table: str, values_list: list[dict], where_keys: list[str]):
+    def update_many(self, table: str, values_list: list[dict], where_keys: list[str]) -> None:
         """
-        Perform multiple UPDATEs using executemany.
+        Generic update many method: Perform multiple update operations efficiently using executemany.
 
         Args:
-            table (str): Table name.
-            values_list (list[dict]): Each dict contains both values to update and keys to filter (WHERE).
-            where_keys (list[str]): Keys to use for WHERE clause.
+            table (str): Table name to update.
+            values_list (list[dict]): List of dictionaries containing columns to set and keys for WHERE conditions.
+            where_keys (list[str]): List of keys in the dictionaries used for WHERE clause.
+
+        Returns:
+            None : When values_list is empty
         """
         cursor = self.conn.cursor()
 
@@ -93,20 +103,20 @@ class BaseRepository:
 
         cursor.executemany(query, param_tuples)
         self.conn.commit()
-    
-    def select_with_filters(self, table_or_view: str, filters: dict, columns: list[str] = None) -> pd.DataFrame | None:
+# endregion Setter
+
+# region Getter
+    def select_with_filters(self, table_or_view: str, filters: dict, columns: list[str] | None = None) -> pd.DataFrame | None:
         """
-        Generic SELECT with dynamic WHERE clause supporting '=' and 'IN' conditions.
+        Generic select method: Perform a SELECT query with WHERE conditions combined by AND, supporting '=' and 'IN'.
 
         Args:
-            table_or_view (str): Table or view name to query.
-            filters (dict): Dictionary of column -> value or list of values.
-                            - If value is list/tuple -> generate IN (...)
-                            - else generate column = ?
-            columns (list[str], optional): List of columns to select. Defaults to ['*'].
+            table_or_view (str): Table or view to query.
+            filters (dict): Mapping of column names to filter values or lists of values.
+            columns (list[str], optional): Columns to select. Defaults to all columns.
 
         Returns:
-            pd.DataFrame | None: Result dataframe or None if no results.
+            pd.DataFrame | None: Resulting data as DataFrame or None if no results found.
         """
         cursor = self.conn.cursor()
         if columns is None:
@@ -141,14 +151,15 @@ class BaseRepository:
     
     def get_by_filter(self, table: str, filters: dict[str, Any]) -> pd.DataFrame:
         """
-        Führt eine SELECT-Abfrage gegen die angegebene Tabelle/View mit optionalen Filtern durch.
+        Generic select method: Retrieve rows from the specified table applying filter conditions.
 
         Args:
-            table (str): Tabellen- oder View-Name.
-            filters (dict): Spaltennamen und ihre Filterwerte.
+            table (str): Name of the table or view to query.
+            filters (dict[str, Any]): Dictionary of column-value filters.
+                Values can be single values or iterables for IN-clauses.
 
         Returns:
-            pd.DataFrame: Resultierende Daten.
+            pd.DataFrame: Resulting rows as a DataFrame. Empty if no matches.
         """
         cursor = self.conn.cursor()
 
@@ -177,36 +188,22 @@ class BaseRepository:
         columns = [desc[0] for desc in cursor.description]
         return pd.DataFrame(rows, columns=columns)
     
-    def select_advanced(
-        self,
-        table_or_view: str,
-        filters: dict[str, Any] = None,
-        exclude: dict[str, Any] = None,
-        columns: list[str] = None,
-        distinct: bool = False,
-        order_by: list[str] = None,
-        return_df: bool = True,
-    ) -> pd.DataFrame | list[tuple] | None:
+    def select_advanced(self, table_or_view: str, filters: dict[str, Any] | None = None, exclude: dict[str, Any] | None = None, columns: list[str] | None = None,
+                        distinct: bool = False, order_by: list[str] = None, return_df: bool = True) -> pd.DataFrame | list[tuple] | None:
         """
-        Erweiterte generische SELECT-Methode mit Support für:
-        - '=' und 'IN' Filter (via `filters`)
-        - '!=' und 'NOT IN' Filter (via `exclude`)
-        - DISTINCT
-        - ORDER BY
-        - Auswahl einzelner Spalten
-        - Rückgabe als DataFrame oder raw tuples
+        Generic select method: Perform an advanced SELECT query supporting filters, exclusions, distinct, ordering, and column selection.
 
         Args:
-            table_or_view (str): Tabelle oder View-Name.
-            filters (dict): Spalten und Werte für '=' bzw. 'IN'.
-            exclude (dict): Spalten und Werte für '!=' bzw. 'NOT IN'.
-            columns (list): Spaltenauswahl, Default: ['*'].
-            distinct (bool): Ob DISTINCT verwendet wird.
-            order_by (list): Spaltennamen zum Sortieren.
-            return_df (bool): Ob ein DataFrame zurückgegeben wird.
+            table_or_view (str): Table or view name to query.
+            filters (dict[str, Any], optional): Column-value pairs for filtering using '=' or 'IN'.
+            exclude (dict[str, Any], optional): Column-value pairs for exclusion using '!=' or 'NOT IN'.
+            columns (list[str], optional): List of columns to select. Defaults to all columns.
+            distinct (bool, optional): Whether to apply DISTINCT to results.
+            order_by (list[str], optional): List of columns to order results by.
+            return_df (bool, optional): Whether to return a DataFrame (True) or list of tuples (False).
 
         Returns:
-            DataFrame, List of Tuples oder None
+            pd.DataFrame | list[tuple] | None: Query results or None if no results.
         """
         filters = filters or {}
         exclude = exclude or {}
@@ -254,24 +251,19 @@ class BaseRepository:
             return pd.DataFrame(rows, columns=column_names)
         return rows
     
-    def select_with_or(
-        self,
-        table_or_view: str,
-        or_filters: dict[str, Any],
-        columns: list[str] = None,
-        return_df: bool = True
-    ) -> pd.DataFrame | list[tuple] | None:
+    def select_with_or(self, table_or_view: str, or_filters: dict[str, Any], columns: list[str] | None = None, return_df: bool = True
+                       ) -> pd.DataFrame | list[tuple] | None:
         """
-        Führt eine SELECT-Abfrage mit OR-verknüpften Bedingungen durch.
+        Generic select method: Perform a SELECT query with OR-combined filter conditions.
 
         Args:
-            table_or_view (str): Name der Tabelle oder View.
-            or_filters (dict): Spaltennamen als Schlüssel, Vergleichswerte als Werte.
-            columns (list[str], optional): Liste der zurückzugebenden Spalten. Default: ['*'].
-            return_df (bool): Ob ein DataFrame zurückgegeben wird.
+            table_or_view (str): Table or view name to query.
+            or_filters (dict[str, Any]): Dictionary of column-value pairs combined with OR.
+            columns (list[str], optional): Columns to select. Defaults to all columns.
+            return_df (bool, optional): Whether to return results as a DataFrame or raw tuples.
 
         Returns:
-            DataFrame oder Liste von Tupeln oder None
+            pd.DataFrame | list[tuple] | None: Query results or None if no rows match.
         """
         cursor = self.conn.cursor()
         cols = ", ".join(columns) if columns else "*"
@@ -303,29 +295,40 @@ class BaseRepository:
 
         return rows
     
-    def get(self, table_or_view, columns: list[str] = None, **filters) -> pd.DataFrame | None:
+    def get(self, table_or_view, columns: list[str] | None = None, **filters) -> pd.DataFrame | None:
+        """
+        Generic select method: Shortcut to select rows with AND-filters from the specified table or view.
+
+        Args:
+            table_or_view (str): Table or view to query.
+            columns (list[str], optional): Columns to select. Defaults to all.
+            **filters: Filter conditions as column=value pairs.
+
+        Returns:
+            pd.DataFrame | None: Resulting rows or None if empty.
+        """
         return self.select_with_filters(
             table_or_view=table_or_view,
             filters=filters,
             columns=columns
         )
         
-    def get_advanced(self, table_or_view: str, columns: list[str] = None, exclude: dict[str, Any] = None, distinct: bool = True,
-        order_by: list[str] = None, return_df: bool = True, **filters) -> pd.DataFrame | list[tuple] | None:
+    def get_advanced(self, table_or_view: str, columns: list[str] | None = None, exclude: dict[str, Any] | None = None, distinct: bool = True,
+                     order_by: list[str] | None = None, return_df: bool = True, **filters) -> pd.DataFrame | list[tuple] | None:
         """
-        Wrapper für `select_advanced` mit vereinfachtem Aufruf über Keyword-Filters.
+        Wrapper for advanced SELECT with keyword filter arguments.
 
         Args:
-            table_or_view (str): Tabelle oder View.
-            columns (list[str], optional): Spaltenauswahl.
-            exclude (dict, optional): NOT-Filter.
-            distinct (bool): Ob DISTINCT verwendet wird.
-            order_by (list[str], optional): Sortierung.
-            return_df (bool): Ob DataFrame zurückgegeben wird.
-            **filters: Beliebige weitere Filter als Keyword-Argumente.
+            table_or_view (str): Table or view to query.
+            columns (list[str], optional): Columns to select.
+            exclude (dict[str, Any], optional): Filters for exclusion.
+            distinct (bool, optional): Apply DISTINCT clause.
+            order_by (list[str], optional): Columns to sort by.
+            return_df (bool, optional): Return a DataFrame if True, else list of tuples.
+            **filters: Column filters as keyword arguments.
 
         Returns:
-            pd.DataFrame | list[tuple] | None
+            pd.DataFrame | list[tuple] | None: Query results or None if empty.
         """
         return self.select_advanced(
             table_or_view=table_or_view,
@@ -338,6 +341,17 @@ class BaseRepository:
         )
     
     def get_raw_query(self, query: str, params: tuple = (), return_df: bool = True):
+        """
+        Execute a raw SQL query with optional parameters.
+
+        Args:
+            query (str): SQL query to execute.
+            params (tuple, optional): Parameters to safely substitute in the query.
+            return_df (bool, optional): Whether to return a DataFrame or raw tuples.
+
+        Returns:
+            pd.DataFrame | list[tuple] | None: Query results or None if no rows.
+        """
         cursor = self.conn.cursor()
         cursor.execute(query, params)
         rows = cursor.fetchall()
@@ -351,15 +365,16 @@ class BaseRepository:
         
     def get_column_names(self, table_name: str) -> list[str]:
         """
-        Returns a list of column names for the given table.
+        Retrieve the column names for a specified table.
 
         Args:
             table_name (str): Name of the table.
 
         Returns:
-            list[str]: A list of column names.
+            list[str]: List of column names in the table.
         """
         cursor = self.conn.cursor()
         cursor.execute(f"PRAGMA table_info({table_name})")
         rows = cursor.fetchall()
         return [row[1] for row in rows] if rows else []
+# endregion Getter

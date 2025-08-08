@@ -1,18 +1,25 @@
-import pandas as pd
-from db.connection import get_connection
 from data_access.base_repository import BaseRepository
 from models.pc_scores import PC_Scores
+import pandas as pd
 
 class PCScoresRepository(BaseRepository):
     def __init__(self):
         """
-        Initializes the ExperimentRepository with a database connection.
+        Initializes the PCScoresRepository with a database connection by calling the parent constructor.
         """
         super().__init__()
-        #self.conn = get_connection()
 
 # region Setter
     def insert_many_pc_scores(self, pc_scores: list[PC_Scores])-> int:
+        """
+        Inserts multiple PC_Scores records into the 'pc_scores' table.
+
+        Args:
+            pc_scores (list[PC_Scores]): A list of PC_Scores model instances to be inserted.
+
+        Returns:
+            int: The number of inserted records or the result from insert_many (depending on implementation).
+        """
         data_list = [{
             "pc_id": score.pc_id,
             "sample_id": score.sample_id,
@@ -20,40 +27,23 @@ class PCScoresRepository(BaseRepository):
         } for score in pc_scores]
         self.insert_many("pc_scores", data_list)
 
-    #def insert_multiple_pc_scores(self, pc_scores: list[PC_Scores]) -> int:
-    #    """
-    #    Inserts a new pc into the database.
-#
-    #    Args:
-    #        scaler (Scaler): The scaler object containing X.
-#
-    #    Returns:
-    #        int: The database ID of the newly inserted sample.
-    #    """
-    #    cursor = self.conn.cursor()
-    #    cursor.executemany("""
-    #    INSERT INTO pc_scores (pc_id, sample_id, pc_score)
-    #    VALUES (?, ?, ?)
-    #    """, [(score.pc_id, score.sample_id, score.pc_score) for score in pc_scores])
-    #    self.conn.commit()
+# endregion Setter
 
 # region Getter
-# use these functions to access data from the experiment table, depending on the needs
-# TODO
-
-    def get_pc_scores_by_exp_id_device(self, exp_id, device, meas_timepoint, distribution_info=None, rotation_type=None):
+    def get_pc_scores_by_exp_id_device(self, exp_id:int, device:str, meas_timepoint:str, distribution_info:str | None = None, 
+                                       rotation_type:str | None = None)-> pd.DataFrame | None:
         """
-        Returns a DataFrame from the Participants PCs table filtered by given criteria.
+        Returns a DataFrame from the 'Participants PCs' table filtered by given criteria.
 
         Args:
-            exp_id (int): Experiment ID
-            device (str): Device name
-            meas_timepoint (str): Measurement time point
-            distribution_info (optional): Distribution info filter
-            rotation_type (optional): Rotation type filter
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            meas_timepoint (str): Measurement time point.
+            distribution_info (optional): Filter for distribution information.
+            rotation_type (optional): Filter for rotation type.
 
         Returns:
-            pd.DataFrame | None: Result dataframe or None if no rows found.
+            pd.DataFrame | None: Result dataframe or None if no matching rows found.
         """
         filters = {
             "exp_id": exp_id,
@@ -67,7 +57,19 @@ class PCScoresRepository(BaseRepository):
 
         return self.get(table_or_view="[Participants PCs]", **filters)
    
-    def get_rotated_pc_scores(self, exp_id, device, meas_timepoint, nr_components=None):
+    def get_rotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, nr_components:int | None =None) -> pd.DataFrame:
+        """
+        Retrieves rotated PC scores from the 'Participants PCs' table, optionally limited by number of components.
+
+        Args:
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            meas_timepoint (str): Measurement time point.
+            nr_components (int, optional): Limit to top N components based on absolute t_value.
+
+        Returns:
+            pd.DataFrame | None: DataFrame of rotated PC scores matching the criteria.
+        """
         if nr_components is not None:
             query = """
                 WITH top_pcs AS (
@@ -123,7 +125,19 @@ class PCScoresRepository(BaseRepository):
 
         return self.get_raw_query(query, params)
     
-    def get_unrotated_pc_scores(self, exp_id, device, meas_timepoint, nr_components=None):
+    def get_unrotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, nr_components:int | None =None) -> pd.DataFrame:
+        """
+        Retrieves unrotated PC scores from the 'Participants PCs' table, optionally limited by number of components.
+
+        Args:
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            meas_timepoint (str): Measurement time point.
+            nr_components (int, optional): Limit to top N components based on absolute t_value.
+
+        Returns:
+            pd.DataFrame | None: DataFrame of unrotated PC scores matching the criteria.
+        """
         if nr_components is not None:
             query = """
                 WITH top_pcs AS (
@@ -158,57 +172,5 @@ class PCScoresRepository(BaseRepository):
             params = [exp_id, device, meas_timepoint]
 
         return self.get_raw_query(query, params)
-   
-    #def get_pc_scores_by_tp_rank(self, exp_id, device, meas_timepoint, min_rank, max_rank, select_rotated=False):
-    #    if select_rotated:
-    #        query = """
-    #            SELECT *
-    #            FROM [Participants PCs]
-    #            WHERE exp_id = ? 
-    #            AND device = ? 
-    #            AND meas_time_point = ? 
-    #            AND (
-    #                rotation_type != 'unrotated'
-    #                OR (
-    #                    rotation_type = 'unrotated'
-    #                    AND pc_id NOT IN (
-    #                        SELECT parent_id
-    #                        FROM [Participants PCs]
-    #                        WHERE parent_id IS NOT NULL
-    #                    )
-    #                )
-    #            )
-    #            AND rank BETWEEN ? AND ?
-    #            ORDER BY ABS(t_value) DESC;
-    #        """
-    #    else:
-    #        query = """
-    #            SELECT *
-    #            FROM [Participants PCs]
-    #            WHERE exp_id = ? 
-    #            AND device = ? 
-    #            AND meas_time_point = ?
-    #            AND rotation_type = 'unrotated'
-    #            AND rank BETWEEN ? AND ?
-    #            ORDER BY ABS(t_value) DESC;
-    #        """
-#
-    #    return self.conn.execute(query, (exp_id, device, meas_timepoint, min_rank, max_rank)).fetchall()
-   #
-   #
-   #
-    #def get_pc_scores_by_tp_rank(self, exp_id, device, meas_timepoint, min_rank, max_rank, select_rotated = False):
-    #    query = """
-    #        SELECT *
-    #        FROM [Participants PCs]
-    #        WHERE exp_id = ? AND device = ? AND meas_time_point = ?
-    #        ORDER BY ABS(t_value) DESC
-    #        LIMIT 10;
-    #    
-    #        SELECT * FROM [Participants PCs]
-    #        WHERE exp_id = ? AND device = ? AND meas_time_point = ? AND rank BETWEEN ? AND ?
-    #        ORDER BY rank
-    #    """
-    #    params = (exp_id, device, meas_timepoint, min_rank, max_rank)
-    #    return self.get_raw_query(query, params)
+    
 # endregion Getter

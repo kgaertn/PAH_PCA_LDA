@@ -1,8 +1,9 @@
-from dataclasses import dataclass, field
-from typing import List, Optional
+from dataclasses import dataclass
+from typing import Optional
 
 @dataclass
 class Participant:
+    """Represents a participant's details and pain-related data (PRMD)."""
     id: int | str
     participant_id: str
     experiment_id: int | str

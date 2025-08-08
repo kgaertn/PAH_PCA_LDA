@@ -1,9 +1,8 @@
-from dataclasses import dataclass, field
-from typing import List, Optional
-import json
+from dataclasses import dataclass
 
 @dataclass
 class PC_Scores:
+    """Represents a principal component score for a sample."""
     id: int
     pc_id: int
     sample_id: int

@@ -3,21 +3,32 @@ from analysis.data_analysis.data_plotting import DataPlotter
 
 from factor_analyzer import calculate_bartlett_sphericity
 from factor_analyzer.factor_analyzer import calculate_kmo
+import pandas as pd
 import scipy.stats as st
 import numpy as np
+import matplotlib.figure
 
 class AssumptionsTester:
     
     def __init__(self):
         """
-        Initializes the PCA_Analyser with a data processor.
+        Initialize the AssumptionsTester with plotter.
         """    
         self.data_plotter = DataPlotter()
-    def check_t_test_assumptions(self, df, distributions_plotted = True):
+        
+    def check_t_test_assumptions(self, df:pd.DataFrame, distributions_plotted:bool = True):  
+        """
+        Check assumptions for t-tests including normality tests on PC scores.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing PC scores and related metadata.
+            distributions_plotted (bool): Whether to plot the distributions or not.
+
+        Returns:
+            List[PC_Ranked]: List of PC_Ranked instances with distribution test results.
+        """
         # TODO: split the plotting from the rest of the assumptions testing
-        """"""
         df_mean = df.groupby(['target', 'axis', 'pc_index', 'pc_id', 'participant_id', 'PRMD_ever'])['pc_score'].mean().reset_index()
-        #self.kolmogorov_smirnov_test(df_mean)
         meas_time_point = df['meas_time_point'][0]     
         target_axes = df[['target', 'axis', 'pc_index', 'pc_id']].drop_duplicates().values.tolist()
         pc_distribution_results = []
@@ -36,12 +47,16 @@ class AssumptionsTester:
                 df_target_axis = df[(df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)][['PRMD_ever','pc_score']]        
                 fig = self.data_plotter.plot_distribution(df_target_axis, 'pc_score', target, axis, pc_index, meas_time_point)
                 self.data_plotter.save_distribution_plot(fig, target, axis, pc_index, meas_time_point)
-        print("")
         return pc_distribution_results
     
-
     @staticmethod
-    def kolmogorov_smirnov_test(df):
+    def kolmogorov_smirnov_test(df:pd.DataFrame):
+        """
+        Perform Kolmogorov-Smirnov tests for normality on PC score distributions.
+
+        Args:
+            df (pd.DataFrame): DataFrame containing PC scores and metadata.
+        """
         target_axes = df[['target', 'axis', 'pc_index']].drop_duplicates().values.tolist()
         diff_target_axes = 0
         for target, axis, pc_index in target_axes:
@@ -55,35 +70,62 @@ class AssumptionsTester:
                 diff_target_axes += 1
         print(f'Total count different distributions: {diff_target_axes}' )
             
-    
     @staticmethod    
-    def shapiro_wilk_test(df, target, axis, pc_id):
+    def shapiro_wilk_test(df:pd.DataFrame, target:str, axis:str, pc_id:int) -> tuple[float]:
+        """
+        Perform Shapiro-Wilk test for normality separately for pain and no-pain groups.
+
+        Args:
+            df (pd.DataFrame): DataFrame with PC scores and metadata.
+            target (str): Target joint or feature.
+            axis (str): Axis corresponding to the target.
+            pc_id (int): Principal component ID.
+
+        Returns:
+            Tuple :
+                stat_pain (float): Test statistic for pain group.
+                p_pain (float): p-value for pain group.
+                stat_nopain (float): Test statistic for no-pain group.
+                p_nopain (float): p-value for no-pain group.
+        """
         pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_id'] == pc_id)]['pc_score']
         nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_id'] == pc_id)]['pc_score']
         stat_pain, p_pain = st.shapiro(pain_group)
         stat_nopain, p_nopain = st.shapiro(nopain_group)
         return stat_pain, p_pain, stat_nopain, p_nopain
         
-
-    
     @staticmethod    
-    def calculate_kaiser_meyer_olkin(df):
+    def calculate_kaiser_meyer_olkin(df:pd.DataFrame):
+        """
+        Calculate and print the Kaiser-Meyer-Olkin measure of sampling adequacy.
+
+        Args:
+            df (pd.DataFrame): DataFrame of data for KMO calculation.
+        """
         kmo_all, kmo_model = calculate_kmo(df)
         if kmo_model < 0.98:
             #print("KMO per variable:", kmo_all)
             print("Overall KMO:", kmo_model)
 
     @staticmethod
-    def drop_redundant_columns(df):
-        # Korrelationsmatrix berechnen
+    def drop_redundant_columns(df:pd.DataFrame) -> tuple[pd.DataFrame, list[str]]:
+        """
+        Remove perfectly correlated redundant columns from the DataFrame.
+
+        Args:
+            df (pd.DataFrame): Input DataFrame with possible redundant columns.
+
+        Returns:
+            Tuple containing:
+                - Cleaned DataFrame with redundant columns dropped.
+                - List of dropped column names.
+        """
         corr_matrix = df.corr()
 
-        # Nur exakte 1.0-Korrelationen (ohne Diagonale)
         exact_ones = corr_matrix.stack()
         exact_ones = exact_ones[exact_ones == 1.0]
         exact_ones = exact_ones[exact_ones.index.get_level_values(0) != exact_ones.index.get_level_values(1)]
 
-        # Nur eine Richtung pro Paar behalten: z. B. alphabetisch nur (A, B), nicht (B, A)
         unique_pairs = set()
         columns_to_drop = set()
 
@@ -91,20 +133,21 @@ class AssumptionsTester:
             pair = tuple(sorted([row, col]))
             if pair not in unique_pairs:
                 unique_pairs.add(pair)
-                # Nur eine der beiden Spalten entfernen – z. B. immer die zweite alphabetisch
                 columns_to_drop.add(pair[1])
 
-        # Spalten im Original-DataFrame entfernen
         df_cleaned = df.drop(columns=columns_to_drop)
 
-        # Liste der entfernten Spalten speichern
         dropped_columns = list(columns_to_drop)
         
         return df_cleaned, dropped_columns
 
-    def calculate_bartlett_test_for_spericity(self, df):
-        
-        #df_cleaned, _ = self.drop_redundant_columns(df)
+    def calculate_bartlett_test_for_spericity(self, df:pd.DataFrame):
+        """
+        Calculate Bartlett’s test for sphericity and print results.
+
+        Args:
+            df (pd.DataFrame): DataFrame of variables to test.
+        """
         corr_matrix = df.corr()
         corr_det = np.linalg.det(corr_matrix)
                
@@ -119,20 +162,45 @@ class AssumptionsTester:
             print("p-value:", p_value)
 
     @staticmethod
-    def compute_corr_matrix(df):
+    def compute_corr_matrix(df:pd.DataFrame) -> pd.DataFrame:
+        """
+        Compute Pearson correlation matrix of the DataFrame.
+
+        Args:
+            df (pd.DataFrame): DataFrame of numeric variables.
+
+        Returns:
+            pd.DataFrame: Correlation matrix.
+        """
         corr_matrix = df.corr(method='pearson')
-        #print(corr_matrix)
         return corr_matrix
     
+    def check_pca_requirements(self, df:pd.DataFrame):
+        """
+        Check requirements for PCA by computing correlations and statistical tests.
 
-    def check_pca_requirements(self, df, target, axis):
-        # TODO: seperate requirements check from the plots
+        Args:
+            df (pd.DataFrame): DataFrame with data.
+
+        Returns:
+            pd.DataFrame: Correlation matrix of the data.
+        """
         corr_matrix = self.compute_corr_matrix(df)
         self.calculate_bartlett_test_for_spericity(df)
         self.calculate_kaiser_meyer_olkin(df)
         return corr_matrix
 
-    
-    def plot_pca_requirements(self, corr_matrix, target, axis):
+    def plot_pca_requirements(self, corr_matrix, target, axis) -> matplotlib.figure.Figure:
+        """
+        Plot the correlation matrix to visualize PCA requirements.
+
+        Args:
+            corr_matrix (pd.DataFrame): Correlation matrix.
+            target (str): Target variable or joint.
+            axis (str): Axis related to the target.
+
+        Returns:
+            matplotlib.figure.Figure: Figure object of the correlation matrix plot.
+        """
         fig = self.data_plotter.plot_corr_matrix(corr_matrix, target, axis)
         return fig

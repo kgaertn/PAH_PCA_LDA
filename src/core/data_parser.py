@@ -1,4 +1,3 @@
-
 import pandas as pd
 import re
 from pathlib import Path
@@ -8,36 +7,32 @@ from models.participant import Participant
 from models.measurement import Measurement
 from models.datapoint import Datapoint
 
-# Define an Interface (Protocol) for Parser
 class DataParser(Protocol):
     def parse(self, file_path: str) -> dict:
         """
-        TODO TO BE IMPLEMENTED
+        Define an Interface (Protocol) for Parser
+        TO BE IMPLEMENTED
         """
         ...
 
-
-# Beispielhafte Parser-Implementierung für Format A
 class FormatRawMPAParser:
-    def extract_mpa_raw_measurement_info(self, data, column):
+    def extract_mpa_raw_measurement_info(self, data:pd.DataFrame, column:int) -> tuple[str|None, int|None]:
         """
-        Extract participant and pre or post measurement from the raw data
+        TO BE IMPLEMENTED
+        Extract participant ID and pre/post measurement indicator from raw data column name.
 
         Args:
-            data (Dataframe): The loaded dataframe 
-            column (int): the column id of the current datapoints
-        
+            data (pd.DataFrame): Loaded dataframe.
+            column (int): Column index for current datapoints.
+
         Returns:
-            str: The participant id
-            int: Pre- or post measurement (0 is pre measurement, 1 is post)
+            Tuple[Optional[str], Optional[int]]: Participant ID and pre/post (0=pre, 1=post).
         """
         column_name = data.columns[column]
-        
-        # Muster definieren
-        pattern_participant = r"P\d{3}"           # Für PXXX
-        pattern_pre_post = r"_(0[1-2])_"     # Für die Zahl 01 oder 02
-        
-        # Extraktion
+
+        pattern_participant = r"P\d{3}"           # For PXXX
+        pattern_pre_post = r"_(0[1-2])_"     # for the number (01 or 02)
+
         participant_match = re.search(pattern_participant, column_name)
         pre_post_match = re.search(pattern_pre_post, column_name)
         
@@ -47,17 +42,18 @@ class FormatRawMPAParser:
         
         return participant, pre_post
     
-    def extract_mpa_raw_dp_info(self, data, bow_stroke, column):
+    def extract_mpa_raw_dp_info(self, data:pd.DataFrame, bow_stroke:int, column:int):
         """
-        Extracts information about location, up/down movement, axis and the 100 datapoints (per up/ down movement) from the raw data. Creates combined datapoints from this information
+        TO BE IMPLEMENTED
+        Extract combined datapoints info: location, axis, bow stroke, up/down, index and value.
 
         Args:
-            data (Dataframe): The loaded dataframe 
-            bow_stroke (int): current bow stroke that corresponds with the datapoints
-            column (int): the column id of the current datapoints
-        
+            data (pd.DataFrame): Loaded dataframe.
+            bow_stroke (int): Current bow stroke index.
+            column (int): Column index for current datapoints.
+
         Returns:
-            list: A list of the combined datapoints
+            List[Tuple]: List of combined datapoints tuples.
         """
         up_down = (column-1)%2
         location = data.iloc[:, column][0]
@@ -73,7 +69,16 @@ class FormatRawMPAParser:
         return data_points   
        
     def parse(self, file_path: str) -> dict:
-        
+        """
+        TO BE IMPLEMENTED
+        Parse raw MPA format file to extract experiments, participants, measurements and datapoints.
+
+        Args:
+            file_path (str): Path to the input Excel file.
+
+        Returns:
+            dict: Parsed data collections with keys 'experiments', 'participants', 'measurements', 'datapoints'.
+        """
         source = "mocap" if ('joints' in str(file_path)) | ('JOINT' in str(file_path)) else 'emg'
         data_state = 'raw'
         experiment_name = 'mpa'
@@ -104,31 +109,28 @@ class FormatRawMPAParser:
             "datapoints": [...],
         }
 
-# Beispielhafte Parser-Implementierung für Format B
 class FormatCleanMPAParser:
         
     def parse_experiment(self, file_path: str) -> dict:
+        """
+        Parse experiment metadata from clean MPA format.
 
-        #file_path = Path(file_locations[0])  # Use Path for consistency
+        Args:
+            file_path (str): Path to the input file.
 
-        # Infer source and unit
-        #file_name = file_path.name.lower()
-        # Parsen von Format B, z.B. 100 Datenpunkte pro Spalte etc.
+        Returns:
+            dict: Dictionary containing list of Experiment objects under 'experiments' key.
+        """
+        
         source = "mocap" if ("joints" in file_path) or ("JOINT" in file_path) else "emg"
         unit = "degree" if (source == "mocap") else "mV"
         data_state = "clean"
         experiment_name = "mpa"
 
-        #df = pd.read_csv(file_path, delimiter='\t')
-#
-        #if df.empty:
-        #    return {"experiments": []}
-
         experiments = []
 
         experiment_ext_id = f"{experiment_name}_{data_state}"
 
-        # Nur ein Experimentobjekt in diesem Fall
         experiments.append(Experiment(
             id=experiment_ext_id,
             name=experiment_name,
@@ -140,7 +142,16 @@ class FormatCleanMPAParser:
         }
     
     def parse(self, file_path: str) -> dict:
-        # Parsen von Format B, z.B. 100 Datenpunkte pro Spalte etc.
+        """
+        Parse clean MPA format file extracting experiments, participants, measurements, and datapoints.
+
+        Args:
+            file_path (str): Path to the input TSV file.
+
+        Returns:
+            dict: Parsed data collections with keys 'experiments', 'participants', 'measurements', 'datapoints'.
+        """
+        
         source = "mocap" if ("joints" in file_path) or ("JOINT" in file_path) else "emg"
         unit = "degree" if (source == "mocap") else "mV"
         data_state = "clean"
@@ -158,7 +169,6 @@ class FormatCleanMPAParser:
 
         experiment_ext_id = f"{experiment_name}_{data_state}"
 
-        # Nur ein Experimentobjekt in diesem Fall
         experiments.append(Experiment(
             id=experiment_ext_id,
             name=experiment_name,
@@ -179,7 +189,6 @@ class FormatCleanMPAParser:
                 if data_part.empty:
                     continue
 
-                # Beispielhafte Info-Extraktion (kann angepasst werden)
                 location = self._extract_location(file_path)
                 axis = None
                 if source == 'mocap':
@@ -216,21 +225,47 @@ class FormatCleanMPAParser:
     
     @staticmethod
     def _extract_location(file_path:str) -> str:
-        # TODO: fix the location extraction for EMG
-        # Remove the axis and extension (e.g., "_Z.tsv")
+        """
+        Extract the location target from the file path, cleaning axis suffix.
+
+        Args:
+            file_path (str): Input file path.
+
+        Returns:
+            str: Location string normalized.
+        """
+        # TODO: fix the location extraction for EMG: Remove the axis and extension (e.g., "_Z.tsv")
         file_name = Path(file_path).name
         name = re.sub(r'_[XYZ]\.tsv$', '', file_name)
-        # Replace underscores with spaces and convert to lower case
         return name.replace('_', ' ').lower()
+    
     @staticmethod
     def _extract_axis(file_path):
-        file_path = Path(file_path)        # e.g., 'LEFT_ELBOW_JOINT_ANGLE_A.tsv'
-        last_letter = file_path.stem[-1]    # e.g., 'LEFT_ELBOW_JOINT_ANGLE_A'
+        """
+        Extract the axis character from the file path stem.
+
+        Args:
+            file_path (str): Input file path.
+
+        Returns:
+            str: Axis character.
+        """
+        file_path = Path(file_path)       
+        last_letter = file_path.stem[-1]
         return last_letter
 
 class FormatRawRefLabParser:
     def parse(self, file_path: str) -> dict:
-        """TODO: TO BE IMPLEMENTED"""
+        """
+        TO BE IMPLEMENTED
+        Parse raw RefLab format file.
+
+        Args:
+            file_path (str): Path to input file.
+
+        Returns:
+            dict: Parsed data including experiments, participants, measurements, and datapoints.
+        """
         ...
         return {
             "experiments": [...],       
@@ -239,10 +274,18 @@ class FormatRawRefLabParser:
             "datapoints": [...],        
         }
 
-# Beispielhafte Parser-Implementierung für Format B
 class FormatCleanRefLabParser:
     def parse(self, file_path: str) -> dict:
-        """TODO: TO BE IMPLEMENTED"""
+        """
+        TO BE IMPLEMENTED
+        Parse clean RefLab format file.
+
+        Args:
+            file_path (str): Path to input file.
+
+        Returns:
+            dict: Parsed data including experiments, participants, measurements, and datapoints.
+        """
         ...
         return {
             "experiments": [...],
@@ -251,11 +294,18 @@ class FormatCleanRefLabParser:
             "datapoints": [...],
         }
 
-
 class FormatPainMPAParser:
    
     def parse(self, file_path: str) -> dict:
-        # Parsen von Format B, z.B. 100 Datenpunkte pro Spalte etc.
+        """
+        Parse pain questionnaire data from Excel file into participant objects.
+
+        Args:
+            file_path (str): Path to the pain data Excel file.
+
+        Returns:
+            dict: Dictionary with key 'participants' containing list of Participant objects.
+        """
         pain_data = pd.read_excel(file_path)
         
         mapping = {
@@ -275,7 +325,6 @@ class FormatPainMPAParser:
             else:
                 subject_id = 'P0' + str(row["Probanden_ID"])
             
-            #subject_id = 'P00' + str(row["Probanden_ID"])
             participant_ext_id = f"mpa_pain_{subject_id}"
             participants.append(Participant(
                 id=participant_ext_id, 
@@ -286,20 +335,6 @@ class FormatPainMPAParser:
                 PRMD_upper_arm_right = row['PRMD_Oberarm_rechts'], PRMD_upper_arm_left = row['PRMD_Oberarm_links'], 
                 PRMD_ever = row['Schmerzen_jemals']
             ))
-        
-        #pain_data_as_lists = pain_data.values.tolist()
-        #for row in pain_data_as_lists:
-        #    if row[0]<10:
-        #        participant_ID = 'P00' + str(row[0])
-        #    else:
-        #        participant_ID = 'P0' + str(row[0])
-        #    
-        #    #datapoint = row[1:] + [experiment, participant_ID]
-        #    #datapoint.append(experiment)
-        #    #datapoint.append(participant_ID)
-        #    #self.db_manager.update_pain_data(datapoint)
-        
-        print("")
         
         return {
             "participants": participants
