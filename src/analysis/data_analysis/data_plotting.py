@@ -21,7 +21,7 @@ class DataPlotter:
         "loading": "#5B8E7D",   
 } 
         
-    def save_distribution_plot(self, fig:matplotlib.figure.Figure, target:str, axis:str, pc_index:int, meas_time_point:str):
+    def save_distribution_plot(self, fig:matplotlib.figure.Figure, target:str, axis:str, pc_index:int, meas_time_point:str, pain_groups: list[str]):
         """
         Save histogram plot to output folder and close it.
 
@@ -32,8 +32,11 @@ class DataPlotter:
             pc_index (int): Principal component index.
             meas_time_point (str): Measurement time point.
         """
+        pain_group_names = self.concat_pain_groups(pain_groups)
+        
         current_path = Path.cwd()
-        output_path = current_path / "output" / "plots" / "Histograms"
+        output_path = current_path / "output" / "plots" / "Histograms" / f"{pain_group_names}"
+        output_path.mkdir(parents=True, exist_ok=True)
         self.save_plot(fig, output_path, f"{meas_time_point}_PC_Scores_Histogram_{target}_{axis}_PC_{pc_index}")
         plt.close()
         
@@ -196,7 +199,7 @@ class DataPlotter:
         plt.close()
         print(f"Plot saved to {full_filename}")
     
-    def plot_distribution(self, df:pd.DataFrame, column:str, target:str, axis:str, pc_index:int, meas_time_point:str, 
+    def plot_distribution(self, df:pd.DataFrame, column:str, target:str, axis:str, pc_index:int, meas_time_point:str, pain_groups:list[str],
                           kind:str='hist', bins:int=10, **kwargs) -> matplotlib.figure.Figure:
         """
         Plots the distribution of a DataFrame column separately for pain and no-pain groups.
@@ -218,7 +221,7 @@ class DataPlotter:
 
         df_pain = df[df['PRMD_ever'] == 1]
         df_nopain = df[df['PRMD_ever'] == 0]
-
+        pain_group_names = self.concat_pain_groups(pain_groups)
         fig, axs = plt.subplots(1, 2, figsize=(12, 5), constrained_layout=True)
 
         if kind == 'hist':
@@ -270,7 +273,7 @@ class DataPlotter:
         else:
             raise ValueError("kind must be 'hist' or 'kde'")
 
-        fig.suptitle(f'{kind.upper()} of PC Scores ({meas_time_point}): {target}, {axis}, PC {pc_index}')
+        fig.suptitle(f'{kind.upper()} of PC Scores ({meas_time_point}/Group:{pain_group_names}): {target}, {axis}, PC {pc_index}')
         return fig
     
     @staticmethod
@@ -450,3 +453,23 @@ class DataPlotter:
                 plt.grid(True)
                 plt.tight_layout()
         return fig
+    
+
+    @staticmethod        
+    def concat_pain_groups(pain_groups:list[str]) -> str:
+        """
+        Concatenate pain group names with 'and'.
+
+        Args:
+            pain_groups (List[str]): List of pain group names.
+
+        Returns:
+            str: Concatenated pain group string.
+        """
+        if len(pain_groups) == 0:
+            result = ''
+        elif len(pain_groups) == 1:
+            result = pain_groups[0]
+        else:
+            result = ' and '.join(pain_groups)
+        return result

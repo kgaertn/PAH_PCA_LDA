@@ -39,6 +39,7 @@ class PCARunner:
             dict: PCA info including scaler and sample scores per target-axis.
         """
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
+        pain_group_names = self.data_plotter.concat_pain_groups(pain_groups)
         total_pca_info = {}
         for target, axis in existing_target_axes:
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
@@ -49,12 +50,13 @@ class PCARunner:
             df_part, df_pca = df_outliers_removed.iloc[:, :-202], df_outliers_removed.iloc[:, -202:]
             measurement_type_id = int(df_transformed['measurement_type_id'].unique()[0])
             if check_requirements:
-                self.plot_data_linearity(target, axis, df_sorted_transformed)
+                self.plot_data_linearity(target, axis, df_sorted_transformed, pain_groups)
                 corr_mat = self.assumptions_tester.check_pca_requirements(df_sorted_transformed.iloc[:, -202:])
                 fig_corr_mat = self.assumptions_tester.plot_pca_requirements(corr_mat, target, axis)
                 current_path = Path.cwd()
-                output_path = current_path / "output" / "plots"
-                output_path = current_path / "output" / "plots" / "Correlation_matrix"
+                #output_path = current_path / "output" / "plots"
+                output_path = current_path / "output" / "plots" / "Correlation_matrix" / f"{pain_group_names}"
+                output_path.mkdir(parents=True, exist_ok=True)
                 self.data_plotter.save_plot(fig_corr_mat, output_path, f"Original_Data_Correlation_matrix_{target}_{axis}")
                 
                 key_cont_corr_mat = self.assumptions_tester.check_pca_requirements(df_transformed.iloc[:, -202:])
@@ -143,7 +145,8 @@ class PCARunner:
         """
         self.data_loader.upload_pc_pain_group_ids(pc_id, pain_group_id)
     
-    def plot_data_linearity(self, target:str, axis:str, df:pd.DataFrame):
+    def plot_data_linearity(self, target:str, axis:str, df:pd.DataFrame, pain_groups:list[str]):
+        #TODO: add the pre/post name to the plot title, so that it is not overwritten
         """
         Plot and save linearity diagnostics for given target and axis.
 
@@ -152,11 +155,13 @@ class PCARunner:
             axis (str): Axis name.
             df (pd.DataFrame): Dataframe with data to plot.
         """
+        pain_group_names = self.data_plotter.concat_pain_groups(pain_groups)
         fig_title = f"{target}, {axis}"
         fig1, fig2 = self.data_plotter.plot_linearity(df, fig_title)
         current_path = Path.cwd()
-        output_path = current_path / "output" / "plots"
-        output_path = current_path / "output" / "plots" / "Linearity_plots"
+        #output_path = current_path / "output" / "plots"
+        output_path = current_path / "output" / "plots" / "Linearity_plots" / f"{pain_group_names}"
+        output_path.mkdir(parents=True, exist_ok=True)
         self.data_plotter.save_plot(fig1, output_path, f"Scatter_matrix_{target}_{axis}")
         self.data_plotter.save_plot(fig2, output_path, f"Lag_plot_{target}_{axis}")        
             
@@ -261,7 +266,7 @@ class PCARunner:
             pc_ids.append(pc_id)
         return pc_ids
     
-    def check_distribution(self, exp_id:int, device:str, measurement_tp:str, distributions_plotted:bool = True)-> list:
+    def check_distribution(self, exp_id:int, device:str, measurement_tp:str, pain_groups:list[str], distributions_plotted:bool = True)-> list:
         """
         Check distribution assumptions (normality) for principal components.
 
@@ -274,11 +279,11 @@ class PCARunner:
         Returns:
             list: Results of distribution tests.
         """
-        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp)
-        pc_distribution_results= self.assumptions_tester.check_t_test_assumptions(pca_df, distributions_plotted)     
+        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups)
+        pc_distribution_results= self.assumptions_tester.check_t_test_assumptions(pca_df, pain_groups, distributions_plotted)     
         return pc_distribution_results   
     
-    def conduct_t_test(self, exp_id:int, device:str, measurement_tp:str)-> pd.DataFrame:
+    def conduct_t_test(self, exp_id:int, device:str, measurement_tp:str, pain_groups:list[str])-> pd.DataFrame:
         """
         Perform t-tests on PCA data to rank principal components.
 
@@ -291,7 +296,7 @@ class PCARunner:
         Returns:
             pd.DataFrame: T-test results and rankings.
         """
-        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, 'normal_distribution',)
+        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution',)
         
         t_test_results = self.pca_analyser.rank_pcs(pca_df)
         return t_test_results
@@ -384,7 +389,8 @@ class PCARunner:
             nr_components (int, optional): Number of components to reconstruct.
             select_rotated (bool): Whether to reconstruct rotated PCs.
         """
-        ranked_pc_scores_df = self.data_loader.load_pcs_by_rank(exp_id, device,measurement_tp, nr_components= nr_components,select_rotated= select_rotated)
+        ranked_pc_scores_df = self.data_loader.load_pcs_by_rank(exp_id, device,measurement_tp,pain_groups, nr_components= nr_components,select_rotated= select_rotated)
+        pain_group_names = self.data_plotter.concat_pain_groups(pain_groups)
         for id, pc_id in enumerate(ranked_pc_scores_df['pc_id'].unique()):
             rank = id+1
             current_pc_df = ranked_pc_scores_df[ranked_pc_scores_df['pc_id'] == pc_id]
@@ -412,7 +418,8 @@ class PCARunner:
             fig = self.data_plotter.plot_PCA_reconstruction(component_reconstruction_data, title_reconstruction, title_loading_vector)
 
             current_path = Path.cwd()
-            output_path = current_path / "output" / "plots" / "PCA_Reconstruction"
+            output_path = current_path / "output" / "plots" / "PCA_Reconstruction" / f"{pain_group_names}"
+            output_path.mkdir(parents=True, exist_ok=True)
             fig_name = f"{measurement_tp}{rotated_suffix_fname}_Rank_{rank}_{target}_{axis}_{pc_name}"
             self.data_plotter.save_plot(fig, output_path, fig_name)
             plt.close()
@@ -437,7 +444,7 @@ class PCARunner:
         Returns:
             dict: Rotation information including rotated loadings and scores.
         """
-        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, 'normal_distribution',)
+        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution',)
         existing_target_axes = pca_df[['target', 'axis']].drop_duplicates().values.tolist()
         total_rotation_info = {}
         for target, axis in existing_target_axes:

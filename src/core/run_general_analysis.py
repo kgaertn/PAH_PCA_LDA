@@ -26,6 +26,7 @@ class GeneralAnalysisRunner:
             key_diff_controlled (bool): If True, apply key difference control.
         """
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
+        pain_group_names = self.concat_pain_groups(pain_groups)
         for target, axis in existing_target_axes:
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df_pain = self.data_loader.clean_data_by_exp_device_tp_target_axis(exp_id, device, measurement_tp, target, axis, participant_ids)
@@ -40,7 +41,8 @@ class GeneralAnalysisRunner:
             title = f"{pain_group_names}, {target}, {axis}: Mean and Std Dev over Time"
             fig = self.data_plotter.plot_mean_std_by_group(df_pain, time_col='dp_time_point', value_cols=value_cols, group_col='PRMD_ever', title=title)
             current_path = Path.cwd()
-            output_path = current_path / "output" / "plots" / "Mean_Std"
+            output_path = current_path / "output" / "plots" / "Mean_Std" / "mean_std_per_group" / f"{pain_group_names}"
+            output_path.mkdir(parents=True, exist_ok=True)
             self.data_plotter.save_plot(fig, output_path, filename)
                 
     def create_plots_mean_std_keys(self, device:str, exp_id:int, measurement_tp:str, pain_groups:list[str]):
@@ -54,7 +56,7 @@ class GeneralAnalysisRunner:
             pain_groups (List[str]): List of pain group names.
         """
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
-        
+        #pain_group_names = self.concat_pain_groups(pain_groups)
         for target, axis in existing_target_axes:
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df_pain = self.data_loader.clean_data_by_exp_device_tp_target_axis(
@@ -98,7 +100,7 @@ class GeneralAnalysisRunner:
             fig.suptitle(f"{pain_group_names}, {target}, {axis}: Mean ± StdDev by Key pair and PRMD", fontsize=16)
             fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-            output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "bow_stroke_pairs"
+            output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "bow_stroke_pairs" / f"{pain_group_names}"
             output_path.mkdir(parents=True, exist_ok=True)
             self.data_plotter.save_plot(fig, output_path, f"{pain_group_names}_{measurement_tp}_Key_Pairs_Subplots_{target}_{axis}")
     
@@ -172,7 +174,7 @@ class GeneralAnalysisRunner:
             fig.suptitle(f"{pain_group_names}, {target}, {axis}: Mean over Time by key pairs per group", fontsize=16)
             fig.tight_layout()
 
-            output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "keys_per_group"
+            output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "keys_per_group" / f"{pain_group_names}"
             output_path.mkdir(parents=True, exist_ok=True)
             self.data_plotter.save_plot(fig, output_path, f"{measurement_tp}_Combined_Mean_{target}_{axis}")
     
@@ -187,6 +189,7 @@ class GeneralAnalysisRunner:
             pain_groups (List[str]): List of pain group names.
         """
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
+        pain_group_names = self.concat_pain_groups(pain_groups)
         for target, axis in existing_target_axes:
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df = self.data_loader.clean_data_by_exp_device_tp_target_axis(
@@ -237,6 +240,6 @@ class GeneralAnalysisRunner:
                 
                 target_str = target.replace(" ", "_")
 
-                output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "keys_per_participant" / f"{target_str}_{axis}" 
+                output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "keys_per_participant" / f"{pain_group_names}"/ f"{target_str}_{axis}" 
                 output_path.mkdir(parents=True, exist_ok=True)
                 self.data_plotter.save_plot(fig, output_path, f"Part_{ext_part_id}_{measurement_tp}_Key_Mean_{target}_{axis}")

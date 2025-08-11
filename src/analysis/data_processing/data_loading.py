@@ -117,7 +117,7 @@ class DataLoader:
             ))
         self.pc_scores_repo.insert_many_pc_scores(pc_scores)
         
-    def load_pc_data(self, exp_id:int, device:str, meas_timepoint:str, distribution_info:str | None = None) -> pd.DataFrame:
+    def load_pc_data(self, exp_id:int, device:str, meas_timepoint:str, pain_groups:list[str], distribution_info:str | None = None) -> pd.DataFrame:
         """
         Load principal component scores for a given experiment, device, and measurement timepoint.
 
@@ -130,10 +130,11 @@ class DataLoader:
         Returns:
             pd.DataFrame: DataFrame containing the principal component scores
         """
-        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id, device, meas_timepoint, distribution_info)
+        df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id=exp_id, device=device, meas_timepoint=meas_timepoint, pain_groups=pain_groups, 
+                                                                distribution_info=distribution_info)
         return df
     
-    def load_pcs_by_rank(self, exp_id:int, device:str, meas_tp:str, nr_components:int | None = None, select_rotated:bool = False):
+    def load_pcs_by_rank(self, exp_id:int, device:str, meas_tp:str, pain_groups:list[str], nr_components:int | None = None, select_rotated:bool = False):
         """
         Load principal components ordered by rank, optionally selecting rotated components.
 
@@ -147,10 +148,11 @@ class DataLoader:
         Returns:
             pd.DataFrame: DataFrame of selected principal components
         """
+        pain_group_names = [", ".join(pain_groups), ", ".join(reversed(pain_groups))]
         if select_rotated:
-            df = self.pc_scores_repo. get_rotated_pc_scores(exp_id, device, meas_tp, nr_components= nr_components)
+            df = self.pc_scores_repo. get_rotated_pc_scores(exp_id, device, meas_tp, pain_group_names, nr_components= nr_components)
         else:
-            df = self.pc_scores_repo. get_unrotated_pc_scores(exp_id, device, meas_tp, nr_components= nr_components)
+            df = self.pc_scores_repo. get_unrotated_pc_scores(exp_id, device, meas_tp,pain_group_names,  nr_components= nr_components)
         return df
     
     def upload_t_test_results(self, df:pd.DataFrame):

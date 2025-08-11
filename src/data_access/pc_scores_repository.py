@@ -30,7 +30,7 @@ class PCScoresRepository(BaseRepository):
 # endregion Setter
 
 # region Getter
-    def get_pc_scores_by_exp_id_device(self, exp_id:int, device:str, meas_timepoint:str, distribution_info:str | None = None, 
+    def get_pc_scores_by_exp_id_device(self, exp_id:int, device:str, meas_timepoint:str, pain_groups:list[str], distribution_info:str | None = None, 
                                        rotation_type:str | None = None)-> pd.DataFrame | None:
         """
         Returns a DataFrame from the 'Participants PCs' table filtered by given criteria.
@@ -45,10 +45,12 @@ class PCScoresRepository(BaseRepository):
         Returns:
             pd.DataFrame | None: Result dataframe or None if no matching rows found.
         """
+        pain_group_names = [", ".join(pain_groups), ", ".join(reversed(pain_groups))]
         filters = {
             "exp_id": exp_id,
             "device": device,
-            "meas_time_point": meas_timepoint
+            "meas_time_point": meas_timepoint,
+            "pain_groups": pain_group_names
         }
         if distribution_info is not None:
             filters["distribution_info"] = distribution_info
@@ -57,7 +59,7 @@ class PCScoresRepository(BaseRepository):
 
         return self.get(table_or_view="[Participants PCs]", **filters)
    
-    def get_rotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, nr_components:int | None =None) -> pd.DataFrame:
+    def get_rotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, pain_group_names:list[str], nr_components:int | None =None) -> pd.DataFrame:
         """
         Retrieves rotated PC scores from the 'Participants PCs' table, optionally limited by number of components.
 
@@ -70,8 +72,9 @@ class PCScoresRepository(BaseRepository):
         Returns:
             pd.DataFrame | None: DataFrame of rotated PC scores matching the criteria.
         """
+        placeholders = ','.join(['?'] * len(pain_group_names)) 
         if nr_components is not None:
-            query = """
+            query = f"""
                 WITH top_pcs AS (
                     SELECT pc_id
                     FROM [Participants PCs]
@@ -80,6 +83,7 @@ class PCScoresRepository(BaseRepository):
                     AND exp_id = ? 
                     AND device = ? 
                     AND meas_time_point = ?
+                    AND pain_groups IN ({placeholders})
                     AND (
                         rotation_type != 'unrotated'
                         OR (
@@ -100,14 +104,15 @@ class PCScoresRepository(BaseRepository):
                 WHERE pc_id IN (SELECT pc_id FROM top_pcs)
                 ORDER BY ABS(t_value) DESC
             """
-            params = [exp_id, device, meas_timepoint, nr_components]
+            params = [exp_id, device, meas_timepoint] + pain_group_names + [nr_components]
         else:
-            query = """
+            query = f"""
                 SELECT *
                 FROM [Participants PCs]
                 WHERE exp_id = ? 
                 AND device = ? 
                 AND meas_time_point = ? 
+                AND pain_groups IN ({placeholders})
                 AND (
                     rotation_type != 'unrotated'
                     OR (
@@ -121,11 +126,11 @@ class PCScoresRepository(BaseRepository):
                 )
                 ORDER BY ABS(t_value) DESC
             """
-            params = [exp_id, device, meas_timepoint]
+            params = [exp_id, device, meas_timepoint] + pain_group_names
 
         return self.get_raw_query(query, params)
     
-    def get_unrotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, nr_components:int | None =None) -> pd.DataFrame:
+    def get_unrotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, pain_group_names:list[str], nr_components:int | None =None) -> pd.DataFrame:
         """
         Retrieves unrotated PC scores from the 'Participants PCs' table, optionally limited by number of components.
 
@@ -138,8 +143,9 @@ class PCScoresRepository(BaseRepository):
         Returns:
             pd.DataFrame | None: DataFrame of unrotated PC scores matching the criteria.
         """
+        placeholders = ','.join(['?'] * len(pain_group_names))
         if nr_components is not None:
-            query = """
+            query = f"""
                 WITH top_pcs AS (
                     SELECT pc_id
                     FROM [Participants PCs]
@@ -148,6 +154,7 @@ class PCScoresRepository(BaseRepository):
                     AND exp_id = ? 
                     AND device = ? 
                     AND meas_time_point = ?
+                    AND pain_groups IN ({placeholders})
                     AND rotation_type = 'unrotated'
                     GROUP BY pc_id
                     ORDER BY MAX(ABS(t_value)) DESC
@@ -158,18 +165,19 @@ class PCScoresRepository(BaseRepository):
                 WHERE pc_id IN (SELECT pc_id FROM top_pcs)
                 ORDER BY ABS(t_value) DESC
             """
-            params = [exp_id, device, meas_timepoint, nr_components]
+            params = [exp_id, device, meas_timepoint] + pain_group_names + [nr_components]
         else:
-            query = """
+            query = f"""
                 SELECT *
                 FROM [Participants PCs]
                 WHERE exp_id = ?
                 AND device = ?
                 AND meas_time_point = ?
+                AND pain_groups IN ({placeholders})
                 AND rotation_type = 'unrotated'
                 ORDER BY ABS(t_value) DESC
             """
-            params = [exp_id, device, meas_timepoint]
+            params = [exp_id, device, meas_timepoint] + pain_group_names
 
         return self.get_raw_query(query, params)
     

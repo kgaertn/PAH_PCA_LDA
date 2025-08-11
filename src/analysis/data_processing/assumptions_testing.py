@@ -16,7 +16,7 @@ class AssumptionsTester:
         """    
         self.data_plotter = DataPlotter()
         
-    def check_t_test_assumptions(self, df:pd.DataFrame, distributions_plotted:bool = True):  
+    def check_t_test_assumptions(self, df:pd.DataFrame, pain_groups:list[str], distributions_plotted:bool = True):  
         """
         Check assumptions for t-tests including normality tests on PC scores.
 
@@ -45,8 +45,8 @@ class AssumptionsTester:
                 shap_wilk_p_no_pain=p_nopain ))
             if not distributions_plotted:
                 df_target_axis = df[(df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)][['PRMD_ever','pc_score']]        
-                fig = self.data_plotter.plot_distribution(df_target_axis, 'pc_score', target, axis, pc_index, meas_time_point)
-                self.data_plotter.save_distribution_plot(fig, target, axis, pc_index, meas_time_point)
+                fig = self.data_plotter.plot_distribution(df_target_axis, 'pc_score', target, axis, pc_index, meas_time_point, pain_groups)
+                self.data_plotter.save_distribution_plot(fig, target, axis, pc_index, meas_time_point, pain_groups)
         return pc_distribution_results
     
     @staticmethod
