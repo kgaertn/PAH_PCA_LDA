@@ -266,7 +266,7 @@ class PCARunner:
             pc_ids.append(pc_id)
         return pc_ids
     
-    def check_distribution(self, exp_id:int, device:str, measurement_tp:str, pain_groups:list[str], distributions_plotted:bool = True)-> list:
+    def check_distribution(self, exp_id:int, device:str, measurement_tp:str, pain_groups:list[str], distributions_plotted:bool = True, rotation_type:str | None = 'unrotated')-> list:
         """
         Check distribution assumptions (normality) for principal components.
 
@@ -279,11 +279,11 @@ class PCARunner:
         Returns:
             list: Results of distribution tests.
         """
-        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups)
+        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, rotation_type=rotation_type)
         pc_distribution_results= self.assumptions_tester.check_t_test_assumptions(pca_df, pain_groups, distributions_plotted)     
         return pc_distribution_results   
     
-    def conduct_t_test(self, exp_id:int, device:str, measurement_tp:str, pain_groups:list[str])-> pd.DataFrame:
+    def conduct_t_test(self, exp_id:int, device:str, measurement_tp:str, pain_groups:list[str], rotation_type:str|None = 'unrotated')-> pd.DataFrame:
         """
         Perform t-tests on PCA data to rank principal components.
 
@@ -296,7 +296,7 @@ class PCARunner:
         Returns:
             pd.DataFrame: T-test results and rankings.
         """
-        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution',)
+        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution',rotation_type=rotation_type)
         
         t_test_results = self.pca_analyser.rank_pcs(pca_df)
         return t_test_results
@@ -444,7 +444,7 @@ class PCARunner:
         Returns:
             dict: Rotation information including rotated loadings and scores.
         """
-        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution',)
+        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution', rotation_type='unrotated')
         existing_target_axes = pca_df[['target', 'axis']].drop_duplicates().values.tolist()
         total_rotation_info = {}
         for target, axis in existing_target_axes:

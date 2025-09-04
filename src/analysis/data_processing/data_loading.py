@@ -117,7 +117,8 @@ class DataLoader:
             ))
         self.pc_scores_repo.insert_many_pc_scores(pc_scores)
         
-    def load_pc_data(self, exp_id:int, device:str, meas_timepoint:str, pain_groups:list[str], distribution_info:str | None = None) -> pd.DataFrame:
+    def load_pc_data(self, exp_id:int, device:str, meas_timepoint:str, pain_groups:list[str], distribution_info:str | None = None, 
+                     rotation_type:str | None = "unrotated") -> pd.DataFrame:
         """
         Load principal component scores for a given experiment, device, and measurement timepoint.
 
@@ -131,7 +132,7 @@ class DataLoader:
             pd.DataFrame: DataFrame containing the principal component scores
         """
         df = self.pc_scores_repo.get_pc_scores_by_exp_id_device(exp_id=exp_id, device=device, meas_timepoint=meas_timepoint, pain_groups=pain_groups, 
-                                                                distribution_info=distribution_info)
+                                                                distribution_info=distribution_info, rotation_type=rotation_type)
         return df
     
     def load_pcs_by_rank(self, exp_id:int, device:str, meas_tp:str, pain_groups:list[str], nr_components:int | None = None, select_rotated:bool = False):
