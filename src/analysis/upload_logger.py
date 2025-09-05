@@ -1,0 +1,36 @@
+import json
+from pathlib import Path
+
+class UploadLogger:
+    def __init__(self, log_path: str, steps: list):
+        self.log_file = Path(log_path)
+        self.log_file.parent.mkdir(exist_ok=True)
+        self.steps = steps
+        self.run_log = self._load_log()
+
+    def _load_log(self):
+        if self.log_file.exists():
+            with open(self.log_file, "r") as f:
+                return json.load(f)
+        return []
+
+    def get_entry(self, analysis_key: dict):
+        entry = next((e for e in self.run_log if self._match(e, analysis_key)), None)
+        if entry is None:
+            entry = {**analysis_key, "uploaded_steps": {step: False for step in self.steps}}
+            self.run_log.append(entry)
+        return entry
+
+    def _match(self, entry, key):
+        return all(entry[k] == key[k] for k in key)
+
+    def mark_uploaded(self, entry, step: str):
+        entry["uploaded_steps"][step] = True
+        self._save_log()
+
+    def is_uploaded(self, entry, step: str):
+        return entry["uploaded_steps"].get(step, False)
+
+    def _save_log(self):
+        with open(self.log_file, "w") as f:
+            json.dump(self.run_log, f, indent=2)

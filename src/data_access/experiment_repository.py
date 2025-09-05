@@ -41,6 +41,26 @@ class ExperimentRepository(BaseRepository):
 # endregion Setter
 
 # region Getter    
+    def get_experiment_id_by_name(self, exp_name):
+        """
+        Retrieves a list of participant IDs associated with the specified pain group.
+
+        Args:
+            pain_group_id (int): The pain group ID to filter participants by.
+
+        Returns:
+            list[int] | None: List of participant IDs belonging to the pain group, or None if none found.
+        """
+        
+        rows = self.get_advanced(
+            table_or_view="experiment",
+            columns=["id"],
+            name = exp_name,
+            return_df=False
+        )
+    
+        return rows[0][0] if rows else None
+
     def get_complete_data_folders(self) -> list[str] | None:
         """
         Retrieves a list of data folder paths for experiments that have completed uploading.

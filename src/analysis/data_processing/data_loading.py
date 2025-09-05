@@ -1,3 +1,4 @@
+from data_access.experiment_repository import ExperimentRepository
 from data_access.scaler_repo import ScalerRepository
 from data_access.pc_ranked_repository import PCRankedRepository
 from data_access.pc_scores_repository import PCScoresRepository
@@ -22,6 +23,7 @@ class DataLoader:
         """
         Initializes the DataLoader with repository instances.
         """    
+        self.exp_repo = ExperimentRepository()
         self.part_repo = ParticipantRepository()
         self.meas_repo = MeasurementRepository()
         self.samp_repo = SampleRepository()
@@ -417,3 +419,6 @@ class DataLoader:
             all_participant_ids.extend(participant_ids)
             all_pain_group_ids.extend([pain_group_id])
         return all_participant_ids, all_pain_group_ids
+    
+    def get_experiment_by_name(self, exp_name):
+        return self.exp_repo.get_experiment_id_by_name(exp_name)

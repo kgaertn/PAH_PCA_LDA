@@ -1,0 +1,14 @@
+exp_name: 'mpa'
+device: "mocap"
+measurement_tp: 'post'
+pain_groups: ["all"]
+analysis:
+  check_requirements: True
+  distributions_plotted: False
+  rotation_method: 'varimax'
+  scaler_type: 'standard_scaler'
+  nr_components: null
+  test_assumptions: True
+  assumptions_relevant: True
+database:
+  path: "data/my_database.db"
