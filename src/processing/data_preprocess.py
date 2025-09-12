@@ -1,7 +1,7 @@
-from data_access.measurement_repository import MeasurementRepository
-from data_access.sample_repository import SampleRepository
-from data_access.datapoint_repository import DatapointRepository
-from models.sample import Sample
+from data_access.repositories.measurement_repository import MeasurementRepository
+from data_access.repositories.sample_repository import SampleRepository
+from data_access.repositories.datapoint_repository import DatapointRepository
+from data_access.models.sample import Sample
 
 import pandas as pd
 import numpy as np

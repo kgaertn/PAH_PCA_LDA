@@ -1,8 +1,8 @@
 from core.data_parser import *
-from data_access.experiment_repository import ExperimentRepository
-from data_access.participant_repository import ParticipantRepository
-from data_access.measurement_repository import MeasurementRepository
-from data_access.datapoint_repository import DatapointRepository
+from data_access.repositories.experiment_repository import ExperimentRepository
+from data_access.repositories.participant_repository import ParticipantRepository
+from data_access.repositories.measurement_repository import MeasurementRepository
+from data_access.repositories.datapoint_repository import DatapointRepository
 
 import os
 

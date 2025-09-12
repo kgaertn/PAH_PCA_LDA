@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.sample import Sample
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.sample import Sample
 
 class SampleRepository(BaseRepository):
     def __init__(self):

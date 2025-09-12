@@ -1,4 +1,4 @@
-from db.connection import get_connection
+from data_access.db.connection import get_connection
 
 def db_setup():
     """

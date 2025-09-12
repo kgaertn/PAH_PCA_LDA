@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.datapoint import Datapoint
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.datapoint import Datapoint
 
 class DatapointRepository(BaseRepository):
     def __init__(self):

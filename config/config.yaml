@@ -3,7 +3,7 @@ device: "mocap"
 measurement_tp: 'post'
 pain_groups: ["all"]
 analysis:
-  check_requirements: True
+  check_requirements: False
   distributions_plotted: False
   rotation_method: 'varimax'
   scaler_type: 'standard_scaler'

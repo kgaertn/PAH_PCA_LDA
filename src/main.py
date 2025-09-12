@@ -1,10 +1,15 @@
-from core.run_pca import PCARunner
-from core.run_general_analysis import GeneralAnalysisRunner
-from models.analysis_config import AnalysisConfig
+from core.analysis_runner import AnalysisRunner
+from core.analyses.pca_analysis import PCAAnalyser
+#from core.analyses.lda_analysis import LDAAnalysis
+#from core.analyses.ttest_analysis import TTestAnalysis
+
+#from core.run_pca import PCARunner
+#from core.analyses.general_analysis import GeneralAnalysisRunner
+#from models.analysis_config import AnalysisConfig
 from analysis.config_loader import ConfigLoader
 from analysis.upload_logger import UploadLogger
-from analysis.data_analysis.analysis_runner import AnalysisRunner
-from db.setup import db_setup
+from core.analysis_runner import AnalysisRunner
+from data_access.db.setup import db_setup
 from pathlib import Path
 import yaml
 import json
@@ -26,10 +31,12 @@ def main():
     logger = UploadLogger(Path(__file__).resolve().parent.parent /  "output" / "logs" / "analysis_log.json", steps)
 
     # Initialize your PCA runner (assume already implemented)
-    pca_runner = PCARunner()  # your existing class
+    #pca_runner = PCARunner()  # your existing class
 
     # Run analysis
-    runner = AnalysisRunner(cfg, logger, pca_runner)
+    runner = AnalysisRunner(cfg, logger)
+    runner.register_analysis(PCAAnalyser(cfg, logger))
+    runner.register_analysis(PCAAnalyser(cfg, logger, run_rotated=True))
     runner.run()
 
     print("Analysis complete.")

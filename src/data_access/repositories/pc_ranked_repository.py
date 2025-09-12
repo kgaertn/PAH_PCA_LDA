@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.pc_ranked import PC_Ranked
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.pc_ranked import PC_Ranked
 
 class PCRankedRepository(BaseRepository):
     def __init__(self):

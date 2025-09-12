@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.measurement import Measurement
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.measurement import Measurement
 
 class MeasurementRepository(BaseRepository):
     def __init__(self):

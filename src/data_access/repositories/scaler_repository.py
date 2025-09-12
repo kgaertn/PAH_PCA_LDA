@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.scaler import Scaler
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.scaler import Scaler
 
 class ScalerRepository(BaseRepository):
     def __init__(self):

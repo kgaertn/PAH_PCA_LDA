@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.pain_group import PainGroup
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.pain_group import PainGroup
 
 class PainGroupRepository(BaseRepository):
     def __init__(self):

@@ -1,9 +1,9 @@
-from analysis.data_processing.data_preprocess import DataProcessor
-from analysis.data_analysis.pca_analysis import PCAAnalyser
-from analysis.data_processing.data_loading import DataLoader
-from analysis.data_processing.assumptions_testing import AssumptionsTester
-from analysis.data_analysis.data_plotting import DataPlotter
-from models.pc_ranked import PC_Ranked
+from processing.data_preprocess import DataProcessor
+from core.analyses.pca_analysis import PCAAnalyser
+from processing.data_loading import DataLoader
+from processing.assumptions_testing import AssumptionsTester
+from processing.data_plotting import DataPlotter
+from data_access.models.pc_ranked import PC_Ranked
 
 from pathlib import Path
 import matplotlib.pyplot as plt

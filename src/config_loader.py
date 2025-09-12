@@ -1,7 +1,7 @@
 from pathlib import Path
 import yaml
-from models.analysis_config import AnalysisConfig
-from analysis.data_processing.data_loading import DataLoader
+from data_access.models.analysis_config import AnalysisConfig
+from processing.data_loading import DataLoader
 
 class ConfigLoader:
     @staticmethod

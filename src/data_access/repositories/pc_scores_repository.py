@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.pc_scores import PC_Scores
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.pc_scores import PC_Scores
 import pandas as pd
 
 class PCScoresRepository(BaseRepository):

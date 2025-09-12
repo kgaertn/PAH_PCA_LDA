@@ -6,12 +6,12 @@ import pandas as pd
 import numpy as np
 import scipy.stats as st
 
-from models.pc_ranked import PC_Ranked
+from data_access.models.pc_ranked import PC_Ranked
 
 # TODO: check PCA requirements: double check outlier removal (and add an option to mark the outliers in the db)
 # TODO: check PCA rotation
 
-class PCAAnalyser:
+class PCAAnalysis:
     
     def __init__(self):
         """

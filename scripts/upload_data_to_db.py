@@ -4,10 +4,10 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parent.parent / "src"))
 from core.uploader_service import UploaderService
-from analysis.data_processing.data_preprocess import DataProcessor
-from data_access.experiment_repository import ExperimentRepository
-from db.setup import db_setup
-from db.setup import add_measurement_type_info
+from processing.data_preprocess import DataProcessor
+from data_access.repositories.experiment_repository import ExperimentRepository
+from data_access.db.setup import db_setup
+from data_access.db.setup import add_measurement_type_info
 
 def main():
     """

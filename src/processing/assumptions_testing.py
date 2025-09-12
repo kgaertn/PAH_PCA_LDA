@@ -1,5 +1,5 @@
-from models.pc_ranked import PC_Ranked
-from analysis.data_analysis.data_plotting import DataPlotter
+from data_access.models.pc_ranked import PC_Ranked
+from processing.data_plotting import DataPlotter
 
 from factor_analyzer import calculate_bartlett_sphericity
 from factor_analyzer.factor_analyzer import calculate_kmo

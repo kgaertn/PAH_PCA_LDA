@@ -1,11 +1,11 @@
-from analysis.data_processing.data_preprocess import DataProcessor
-from analysis.data_processing.data_loading import DataLoader
-from analysis.data_analysis.data_plotting import DataPlotter
+from processing.data_preprocess import DataProcessor
+from processing.data_loading import DataLoader
+from processing.data_plotting import DataPlotter
 
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-class GeneralAnalysisRunner:
+class GeneralAnalyser:
     def __init__(self):
         """
         Initializes the GeneralAnalysisRunner with data loader, processor and plotter instances.

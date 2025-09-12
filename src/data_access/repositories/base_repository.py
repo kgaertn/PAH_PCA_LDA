@@ -1,7 +1,7 @@
 import pandas as pd
 from typing import Any
 
-from db.connection import get_connection
+from data_access.db.connection import get_connection
 
 class BaseRepository:
     def __init__(self):

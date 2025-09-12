@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.experiment import Experiment
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.experiment import Experiment
 
 class ExperimentRepository(BaseRepository):
     def __init__(self):

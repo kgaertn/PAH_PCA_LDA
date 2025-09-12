@@ -2,10 +2,10 @@ import pandas as pd
 import re
 from pathlib import Path
 from typing import Protocol
-from models.experiment import Experiment
-from models.participant import Participant
-from models.measurement import Measurement
-from models.datapoint import Datapoint
+from data_access.models.experiment import Experiment
+from data_access.models.participant import Participant
+from data_access.models.measurement import Measurement
+from data_access.models.datapoint import Datapoint
 
 class DataParser(Protocol):
     def parse(self, file_path: str) -> dict:

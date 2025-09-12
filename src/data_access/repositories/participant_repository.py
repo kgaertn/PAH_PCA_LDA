@@ -1,5 +1,5 @@
-from data_access.base_repository import BaseRepository
-from models.participant import Participant
+from data_access.repositories.base_repository import BaseRepository
+from data_access.models.participant import Participant
 
 class ParticipantRepository(BaseRepository):
     def __init__(self):
