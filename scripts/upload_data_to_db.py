@@ -29,8 +29,7 @@ def main():
 
     # TODO: Layers wieder sauber trennen: wie erkennen, dass alle dateien schon in der DB sind? 
     exp_repo = ExperimentRepository()
-
-    
+   
     uploader = UploaderService()
     
     relative_path = uploader.get_relative_data_path_without_filename(clean_mpa_folder_mocap)

@@ -433,7 +433,7 @@ def add_rotation_sequence():
     WHEN target = 'left ht joint angle' AND axis = 'Y' THEN 'internal_rotation'
 	WHEN target = 'left ht joint angle' AND axis = 'Z' THEN 'flexion'
 	WHEN target = 'left humeroulnar joint angle' AND axis = 'Z' THEN 'redundant'
-	WHEN target = 'left radioulnar joint angle' AND axis = 'Y' THEN 'pronation'
+	WHEN target = 'left radioulnar joint angle' AND axis = 'Y' THEN 'redundant'
 	WHEN target = 'left st joint angle' AND axis = 'X' THEN 'upward_rotation'
 	WHEN target = 'left st joint angle' AND axis = 'Y' THEN 'protraction'
 	WHEN target = 'left st joint angle' AND axis = 'Z' THEN 'posterior_tilt'

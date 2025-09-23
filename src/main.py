@@ -1,13 +1,14 @@
 from core.analysis_runner import AnalysisRunner
 from core.analyses.pca_analysis import PCAAnalyser
 #from core.analyses.lda_analysis import LDAAnalysis
-#from core.analyses.ttest_analysis import TTestAnalysis
+from core.analyses.ttest_analysis import TTestAnalyser
+from core.analyses.general_analysis import GeneralAnalyser
 
 #from core.run_pca import PCARunner
 #from core.analyses.general_analysis import GeneralAnalysisRunner
 #from models.analysis_config import AnalysisConfig
-from analysis.config_loader import ConfigLoader
-from analysis.upload_logger import UploadLogger
+from config_loader import ConfigLoader
+from upload_logger import UploadLogger
 from core.analysis_runner import AnalysisRunner
 from data_access.db.setup import db_setup
 from pathlib import Path
@@ -35,7 +36,9 @@ def main():
 
     # Run analysis
     runner = AnalysisRunner(cfg, logger)
+    runner.register_analysis(GeneralAnalyser(cfg, logger))
     runner.register_analysis(PCAAnalyser(cfg, logger))
+    runner.register_analysis(TTestAnalyser(cfg, logger))
     runner.register_analysis(PCAAnalyser(cfg, logger, run_rotated=True))
     runner.run()
 

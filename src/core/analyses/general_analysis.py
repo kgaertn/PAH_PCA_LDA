@@ -1,19 +1,45 @@
-from processing.data_preprocess import DataProcessor
+from core.analyses.abstract_analysis import AbstractAnalyser
 from processing.data_loading import DataLoader
 from processing.data_plotting import DataPlotter
+from processing.data_preprocess import DataProcessor
+from processing.assumptions_testing import AssumptionsTester
 
 from pathlib import Path
 import matplotlib.pyplot as plt
 
-class GeneralAnalyser:
-    def __init__(self):
-        """
-        Initializes the GeneralAnalysisRunner with data loader, processor and plotter instances.
-        """
-        self.data_processor = DataProcessor()
+class GeneralAnalyser(AbstractAnalyser):
+    def __init__(self, cfg, logger):
+        super().__init__(cfg, logger)
+        self.analysis_name = 'general'
+        self.cfg = cfg
         self.data_loader = DataLoader()
+        self.data_processor = DataProcessor()
         self.data_plotter = DataPlotter()
+        self.assumptions_tester = AssumptionsTester()
+
+    def run(self, key):
+        """"""
+        device = key['device']
+        exp_id = key['exp_id'] 
+        measurement_tp = key['measurement_tp'] 
+        pain_groups = key['pain_groups'] 
+        create_general_plots = key['create_general_plots']  
         
+        if create_general_plots:
+            self.create_plots_key_per_group(device, exp_id, measurement_tp, pain_groups)
+            self.create_plots_mean_std_keys(device, exp_id, measurement_tp, pain_groups)
+            self.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups)
+            self.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups, key_diff_controlled=True)
+            self.create_plots_key_per_participant(device, exp_id, measurement_tp, pain_groups)
+        return None
+    
+
+    def handle_results(self, results, entry):
+        """TODO"""
+        ##self.upload_pca_analysis(results)
+        #self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.data_loader.upload_distribution_info, 
+        #                  result = results)
+                     
     def create_plots_mean_std(self, device:str, exp_id:int, measurement_tp:str, pain_groups:list[str], key_diff_controlled:bool = False):
         """
         Create and save plots of mean and standard deviation over time for specified groups.
@@ -46,6 +72,7 @@ class GeneralAnalyser:
             self.data_plotter.save_plot(fig, output_path, filename)
                 
     def create_plots_mean_std_keys(self, device:str, exp_id:int, measurement_tp:str, pain_groups:list[str]):
+        # TODO: adjust this function, so that the plotting happens in the data_plotter
         """
         Create and save subplots of mean ± std dev by key pairs and PRMD groups.
 

@@ -34,15 +34,13 @@ class PCAAnalyser(AbstractAnalyser):
     def prepare(self, key, target, axis):
         """"""
         if self.run_rotated:
-            # TODO
             prepared_data = self.prepare_rotated(key, target, axis)
         else:
             prepared_data = self.prepare_unrotated(key, target, axis)
         return prepared_data
 
     def handle_results(self, results, entry):
-        """TODO"""
-        #self.upload_pca_analysis(results)
+        """"""
         self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.upload_pca_analysis, 
                           result = results)
         
@@ -75,8 +73,8 @@ class PCAAnalyser(AbstractAnalyser):
         total_pca_info = {}
         for target, axis in existing_target_axes:
             prepared_data = self.prepare(key, target, axis)
-            if check_requirements:
-                self.check_pca_requirements(prepared_data=prepared_data, target=target, axis=axis, pain_groups=pain_groups)
+            #if check_requirements:
+            #    self.check_pca_requirements(prepared_data=prepared_data, target=target, axis=axis, pain_groups=pain_groups)
             df_pca = prepared_data["df_pca"]
             df_part = prepared_data["df_part"]
             pain_group_ids = prepared_data["pain_group_ids"]
@@ -505,10 +503,19 @@ class PCAAnalyser(AbstractAnalyser):
         pain_groups = key['pain_groups']
         nr_components = key['nr_components']
         scaler_type = key['scaler_type']
+        rotation_type = key['rotation_method']
+        t_test_assumptions_relevant = key['t_test_assumptions_relevant']
+        t_test_distribution_type = key['t_test_distribution_type']
         
         ranked_pc_scores_df = self.data_loader.load_pcs_by_rank(exp_id, device,measurement_tp,pain_groups, 
-                                                                nr_components= nr_components,select_rotated= select_rotated)
+                                                                nr_components= nr_components,select_rotated= select_rotated, 
+                                                                use_distribution= t_test_assumptions_relevant, distribution_type = t_test_distribution_type)
         pain_group_names = self.data_plotter.concat_pain_groups(pain_groups)
+        ranked_pc_scores_df["loading_vector"] = ranked_pc_scores_df["loading_vector"].apply(PC_Ranked.list_from_json)
+        #np.array(PC_Ranked.list_from_json(ranked_pc_scores_df['loading_vector'].unique()[0]))
+        overall_min = ranked_pc_scores_df["loading_vector"].explode().min()
+        overall_max = ranked_pc_scores_df["loading_vector"].explode().max()
+        
         for id, pc_id in enumerate(ranked_pc_scores_df['pc_id'].unique()):
             rank = id+1
             current_pc_df = ranked_pc_scores_df[ranked_pc_scores_df['pc_id'] == pc_id]
@@ -533,17 +540,21 @@ class PCAAnalyser(AbstractAnalyser):
             title_reconstruction = f'Single component reconstruction: Rank {rank}, {target} {axis}; {pc_name}{rotated_suffix_title}'
             title_loading_vector = f'Loading vector: Rank {rank} {target} {axis}; {pc_name}{rotated_suffix_title}'
 
-            fig = self.data_plotter.plot_PCA_reconstruction(component_reconstruction_data, title_reconstruction, title_loading_vector)
-
+            # TODO: adjust the scaling of loading vector in the plots!
+            # TODO: create only 1 plot for PCA reconstruction -> regular, per group, loading vector
+            fig = self.data_plotter.plot_PCA_reconstruction(component_reconstruction_data, title_reconstruction, title_loading_vector, y_max = overall_max, y_min = overall_min)
+            
+            distribution_label = f"{t_test_distribution_type}" if t_test_assumptions_relevant else "no_distribution_tested"
+            rotation_label = f"{rotation_type}" if select_rotated else "unrotated"
             current_path = Path.cwd()
-            output_path = current_path / "output" / "plots" / "PCA_Reconstruction" / f"{pain_group_names}"
+            output_path = current_path / "output" / "plots" / "PCA_Reconstruction" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
             output_path.mkdir(parents=True, exist_ok=True)
             fig_name = f"{measurement_tp}{rotated_suffix_fname}_Rank_{rank}_{target}_{axis}_{pc_name}"
             self.data_plotter.save_plot(fig, output_path, fig_name)
             #plt.close()
-            fig = self.data_plotter.plot_PCA_reconstruction_per_group(component_reconstruction_data, title_reconstruction, title_loading_vector)
-            fig_name = f"{measurement_tp}{rotated_suffix_fname}_per_group_Rank_{rank}_{target}_{axis}_{pc_name}"
-            self.data_plotter.save_plot(fig, output_path, fig_name)
+            #fig = self.data_plotter.plot_PCA_reconstruction_per_group(component_reconstruction_data, title_reconstruction, title_loading_vector)
+            #fig_name = f"{measurement_tp}{rotated_suffix_fname}_per_group_Rank_{rank}_{target}_{axis}_{pc_name}"
+            #self.data_plotter.save_plot(fig, output_path, fig_name)
             #plt.close()
             
     def reconstruct_single_component(self, pc_df:pd.DataFrame, orig_df:pd.DataFrame, scaler:StandardScaler) -> dict:
@@ -559,7 +570,7 @@ class PCAAnalyser(AbstractAnalyser):
             dict: Contains mean waveforms, loading vector, PC scores, and lower/upper bands.
         """
         
-        loading_vector = np.array(PC_Ranked.list_from_json(pc_df['loading_vector'].unique()[0]))
+        loading_vector = np.array(pc_df['loading_vector'].iloc[0])
         pc_scores_df_pain = pc_df[pc_df['PRMD_ever'] == 1]
         pc_scores_df_nopain = pc_df[pc_df['PRMD_ever'] == 0]
         pc_scores = np.array(pc_df['pc_score'])

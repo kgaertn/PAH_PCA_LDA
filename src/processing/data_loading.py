@@ -137,7 +137,8 @@ class DataLoader:
                                                                 distribution_info=distribution_info, rotation_type=rotation_type)
         return df
     
-    def load_pcs_by_rank(self, exp_id:int, device:str, meas_tp:str, pain_groups:list[str], nr_components:int | None = None, select_rotated:bool = False):
+    def load_pcs_by_rank(self, exp_id:int, device:str, meas_tp:str, pain_groups:list[str], nr_components:int | None = None, select_rotated:bool = False, 
+                         use_distribution: bool = False, distribution_type: str | None = "normal_distribution"):
         """
         Load principal components ordered by rank, optionally selecting rotated components.
 
@@ -153,9 +154,11 @@ class DataLoader:
         """
         pain_group_names = [", ".join(pain_groups), ", ".join(reversed(pain_groups))]
         if select_rotated:
-            df = self.pc_scores_repo. get_rotated_pc_scores(exp_id, device, meas_tp, pain_group_names, nr_components= nr_components)
+            df = self.pc_scores_repo. get_rotated_pc_scores(exp_id, device, meas_tp, pain_group_names, nr_components= nr_components, 
+                                                            use_distribution = use_distribution, distribution_type = distribution_type)
         else:
-            df = self.pc_scores_repo. get_unrotated_pc_scores(exp_id, device, meas_tp,pain_group_names,  nr_components= nr_components)
+            df = self.pc_scores_repo. get_unrotated_pc_scores(exp_id, device, meas_tp,pain_group_names,  nr_components= nr_components,
+                                                              use_distribution = use_distribution, distribution_type = distribution_type)
         return df
     
     def upload_t_test_results(self, df:pd.DataFrame):

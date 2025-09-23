@@ -40,49 +40,49 @@ class DataPlotter:
         self.save_plot(fig, output_path, f"{meas_time_point}_PC_Scores_Histogram_{target}_{axis}_PC_{pc_index}")
         plt.close()
         
-    def plot_PCA_reconstruction_per_group(self,component_data:dict, title_waveform:str = "Mean Waveform", 
-                                          title_loading:str ="Loading Vector") -> matplotlib.figure.Figure:
-        """
-        Plots the reconstructed mean waveforms with percentile bands and the corresponding 
-        loading vector of a PCA component per participant group.
+    #def plot_PCA_reconstruction_per_group(self,component_data:dict, title_waveform:str = "Mean Waveform", 
+    #                                      title_loading:str ="Loading Vector") -> matplotlib.figure.Figure:
+    #    """
+    #    Plots the reconstructed mean waveforms with percentile bands and the corresponding 
+    #    loading vector of a PCA component per participant group.
+#
+    #    Args:
+    #        component_data (dict): Reconstruction data with waveforms and loadings.
+    #        title_waveform (str): Title for waveform plot.
+    #        title_loading (str): Title for loading plot.
+#
+    #    Returns:
+    #        tuple: Matplotlib figure and axes.
+    #    """
+    #    
+    #    mean_waveform_pain = component_data['mean_waveform_pain']
+    #    mean_waveform_no_pain = component_data['mean_waveform_no_pain']
+    #    lower_band_pain = component_data['lower_band_pain']
+    #    upper_band_pain = component_data['upper_band_pain']
+    #    lower_band_nopain = component_data['lower_band_no_pain']
+    #    upper_band_nopain = component_data['upper_band_no_pain']
+    #    loading_vector = component_data['loading_vector']
+    #    fig, axs = plt.subplots(2, 1, figsize=(10, 8), constrained_layout=True)
+    #
+    #    # Definierte Labels
+    #    labels_colors = [
+    #        ("Pain", mean_waveform_pain),
+    #        ("No Pain", mean_waveform_no_pain),
+    #        ("Lower Band Pain", lower_band_pain),
+    #        ("Upper Band Pain", upper_band_pain),
+    #        ("Lower Band No Pain", lower_band_nopain),
+    #        ("Upper Band No Pain", upper_band_nopain),
+    #    ]
 
-        Args:
-            component_data (dict): Reconstruction data with waveforms and loadings.
-            title_waveform (str): Title for waveform plot.
-            title_loading (str): Title for loading plot.
-
-        Returns:
-            tuple: Matplotlib figure and axes.
-        """
-        
-        mean_waveform_pain = component_data['mean_waveform_pain']
-        mean_waveform_no_pain = component_data['mean_waveform_no_pain']
-        lower_band_pain = component_data['lower_band_pain']
-        upper_band_pain = component_data['upper_band_pain']
-        lower_band_nopain = component_data['lower_band_no_pain']
-        upper_band_nopain = component_data['upper_band_no_pain']
-        loading_vector = component_data['loading_vector']
-        fig, axs = plt.subplots(2, 1, figsize=(10, 8), constrained_layout=True)
-
-        # Definierte Labels
-        labels_colors = [
-            ("Pain", mean_waveform_pain),
-            ("No Pain", mean_waveform_no_pain),
-            ("Lower Band Pain", lower_band_pain),
-            ("Upper Band Pain", upper_band_pain),
-            ("Lower Band No Pain", lower_band_nopain),
-            ("Upper Band No Pain", upper_band_nopain),
-        ]
-
-        for label, data in labels_colors:
-            linestyle = '-'
-            if "Lower Band" in label:
-                linestyle = '--'
-            elif "Upper Band" in label:
-                linestyle = ':'
-
-            axs[0].plot(data, label=label, linestyle=linestyle,
-                        color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
+    #    for label, data in labels_colors:
+    #        linestyle = '-'
+    #        if "Lower Band" in label:
+    #            linestyle = '--'
+    #        elif "Upper Band" in label:
+    #            linestyle = ':'
+#
+    #        axs[0].plot(data, label=label, linestyle=linestyle,
+    #                    color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
 
         axs[0].set_title(title_waveform)
         axs[0].set_xlabel("Normalized time (%)")
@@ -120,7 +120,7 @@ class DataPlotter:
         return "#000000"
 
     def plot_PCA_reconstruction(self, component_data:dict, title_waveform:str="Mean Waveform", 
-                                title_loading:str="Loading Vector") -> matplotlib.figure.Figure:
+                                title_loading:str="Loading Vector", y_max: float|None = None, y_min: float|None = None) -> matplotlib.figure.Figure:
         """
         Plots the reconstructed mean waveforms with percentile bands and the corresponding 
         loading vector of a PCA component.
@@ -133,21 +133,36 @@ class DataPlotter:
         Returns:
             matplotlib.figure.Figure: The figure object containing the plots.
         """
-        
         mean_waveform_pain = component_data['mean_waveform_pain']
         mean_waveform_no_pain = component_data['mean_waveform_no_pain']
         lower_band = component_data['lower_band']
         upper_band = component_data['upper_band']
+        lower_band_pain = component_data['lower_band_pain']
+        upper_band_pain = component_data['upper_band_pain']
+        lower_band_nopain = component_data['lower_band_no_pain']
+        upper_band_nopain = component_data['upper_band_no_pain']
         loading_vector = component_data['loading_vector']
         
-                # Definierte Labels
+        
+        # Definierte Labels
         labels_colors = [
             ("Pain", mean_waveform_pain),
             ("No Pain", mean_waveform_no_pain),
             ("Lower Band", lower_band),
-            ("Upper Band", upper_band)
+            ("Upper Band", upper_band),
         ]
-        fig, axs = plt.subplots(2, 1, figsize=(10, 8), constrained_layout=True)
+        
+        labels_colors_groups = [
+            ("Pain", mean_waveform_pain),
+            ("No Pain", mean_waveform_no_pain),
+            ("Lower Band Pain", lower_band_pain),
+            ("Upper Band Pain", upper_band_pain),
+            ("Lower Band No Pain", lower_band_nopain),
+            ("Upper Band No Pain", upper_band_nopain),
+        ]
+
+        
+        fig, axs = plt.subplots(3, 1, figsize=(10, 12), constrained_layout=True)
         
         for label, data in labels_colors:
             linestyle = '-'
@@ -159,6 +174,15 @@ class DataPlotter:
             axs[0].plot(data, label=label, linestyle=linestyle,
                         color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
 
+        for label, data in labels_colors_groups:
+            linestyle = '-'
+            if "Lower Band" in label:
+                linestyle = '--'
+            elif "Upper Band" in label:
+                linestyle = ':'
+
+            axs[1].plot(data, label=label, linestyle=linestyle,
+                        color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
     
         # Plot mean waveforms
         #axs[0].plot(mean_waveform_pain, label="Pain", color="blue")
@@ -171,16 +195,86 @@ class DataPlotter:
         axs[0].legend(loc='upper right')
         axs[0].grid(True)
         
+        axs[1].set_title(title_waveform)
+        axs[1].set_xlabel("Normalized time (%)")
+        axs[1].set_ylabel("Amplitude (°)")
+        axs[1].legend(loc='upper right')
+        axs[1].grid(True)
+        
         # Plot loading vector
         #axs[1].plot(loading_vector, color="green")
-        axs[1].plot(loading_vector, label="Loading Vector",
+        axs[2].plot(loading_vector, label="Loading Vector",
             color=self.get_color_for_label("loading"))
-        axs[1].set_title(title_loading)
-        axs[1].set_xlabel("Component Index")
-        axs[1].set_ylabel("Loading Value")
-        axs[1].grid(True)
+        axs[2].set_title(title_loading)
+        axs[2].set_xlabel("Component Index")
+        axs[2].set_ylabel("Loading Value")
+        axs[2].set_ylim(y_min, y_max)
+        axs[2].grid(True)
         plt.close(fig)
-        return fig       
+        return fig      
+
+    #def plot_PCA_reconstruction(self, component_data:dict, title_waveform:str="Mean Waveform", 
+    #                            title_loading:str="Loading Vector") -> matplotlib.figure.Figure:
+    #    """
+    #    Plots the reconstructed mean waveforms with percentile bands and the corresponding 
+    #    loading vector of a PCA component.
+#
+    #    Args:
+    #    component_data (dict): Reconstruction output containing mean waveforms, bands, and loading vector.
+    #    title_waveform (str): Title for the waveform subplot.
+    #    title_loading (str): Title for the loading vector subplot.
+#
+    #    Returns:
+    #        matplotlib.figure.Figure: The figure object containing the plots.
+    #    """
+    #    
+    #    mean_waveform_pain = component_data['mean_waveform_pain']
+    #    mean_waveform_no_pain = component_data['mean_waveform_no_pain']
+    #    lower_band = component_data['lower_band']
+    #    upper_band = component_data['upper_band']
+    #    loading_vector = component_data['loading_vector']
+    #    
+    #            # Definierte Labels
+    #    labels_colors = [
+    #        ("Pain", mean_waveform_pain),
+    #        ("No Pain", mean_waveform_no_pain),
+    #        ("Lower Band", lower_band),
+    #        ("Upper Band", upper_band)
+    #    ]
+    #    fig, axs = plt.subplots(2, 1, figsize=(10, 8), constrained_layout=True)
+    #    
+    #    for label, data in labels_colors:
+    #        linestyle = '-'
+    #        if "Lower Band" in label:
+    #            linestyle = '--'
+    #        elif "Upper Band" in label:
+    #            linestyle = ':'
+#
+    #        axs[0].plot(data, label=label, linestyle=linestyle,
+    #                    color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
+#
+    #
+    #    # Plot mean waveforms
+    #    #axs[0].plot(mean_waveform_pain, label="Pain", color="blue")
+    #    #axs[0].plot(mean_waveform_no_pain, label="No Pain", color="orange")
+    #    #axs[0].plot(lower_band, label="Lower Band", linestyle='--', color="black")
+    #    #axs[0].plot(upper_band, label="Upper Band", linestyle=':', color="black")
+    #    axs[0].set_title(title_waveform)
+    #    axs[0].set_xlabel("Normalized time (%)")
+    #    axs[0].set_ylabel("Amplitude (°)")
+    #    axs[0].legend(loc='upper right')
+    #    axs[0].grid(True)
+    #    
+    #    # Plot loading vector
+    #    #axs[1].plot(loading_vector, color="green")
+    #    axs[1].plot(loading_vector, label="Loading Vector",
+    #        color=self.get_color_for_label("loading"))
+    #    axs[1].set_title(title_loading)
+    #    axs[1].set_xlabel("Component Index")
+    #    axs[1].set_ylabel("Loading Value")
+    #    axs[1].grid(True)
+    #    plt.close(fig)
+    #    return fig       
     
     @staticmethod
     def save_plot(fig:matplotlib.figure.Figure, file_path:Path, filename:str, dpi:int=300, file_format:str='png'):

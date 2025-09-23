@@ -19,10 +19,13 @@ class ConfigLoader:
             pain_groups=raw_cfg["pain_groups"],
             check_requirements=raw_cfg["analysis"]["check_requirements"],
             distributions_plotted=raw_cfg["analysis"]["distributions_plotted"],
+            create_general_plots=raw_cfg["analysis"]["create_general_plots"],
+            check_ttest_distribution=raw_cfg["analysis"]["check_ttest_distribution"],
             rotation_method=raw_cfg["analysis"]["rotation_method"],
             scaler_type=raw_cfg["analysis"]["scaler_type"],
             nr_components=raw_cfg["analysis"]["nr_components"],
-            test_assumptions=raw_cfg["analysis"]["test_assumptions"],
-            assumptions_relevant=raw_cfg["analysis"]["assumptions_relevant"]
+            test_t_test_assumptions=raw_cfg["analysis"]["test_t_test_assumptions"],
+            t_test_assumptions_relevant=raw_cfg["analysis"]["t_test_assumptions_relevant"],
+            t_test_distribution_type = raw_cfg["analysis"]["t_test_distribution_type"]
         )
         

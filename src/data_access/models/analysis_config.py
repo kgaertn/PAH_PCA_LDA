@@ -9,8 +9,11 @@ class AnalysisConfig:
     pain_groups: List[str]
     check_requirements: bool
     distributions_plotted: bool
+    create_general_plots: bool
+    check_ttest_distribution: bool
     rotation_method: str
     scaler_type: str
     nr_components: int
-    test_assumptions: bool
-    assumptions_relevant: bool
+    test_t_test_assumptions: bool
+    t_test_assumptions_relevant: bool
+    t_test_distribution_type: str

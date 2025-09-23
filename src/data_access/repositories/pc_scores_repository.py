@@ -59,31 +59,42 @@ class PCScoresRepository(BaseRepository):
 
         return self.get(table_or_view="[Participants PCs]", **filters)
    
-    def get_rotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, pain_group_names:list[str], nr_components:int | None =None) -> pd.DataFrame:
+    def get_rotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, pain_group_names:list[str], nr_components:int | None =None, 
+                                  use_distribution: bool = False, distribution_type: str | None = "normal_distribution") -> pd.DataFrame:
         """
-        Retrieves rotated PC scores from the 'Participants PCs' table, optionally limited by number of components.
+        Retrieves rotated PC scores from the 'Participants PCs' table, 
+        optionally limited by number of components and distribution type.
 
         Args:
             exp_id (int): Experiment ID.
             device (str): Device name.
             meas_timepoint (str): Measurement time point.
-            nr_components (int, optional): Limit to top N components based on absolute t_value.
+            pain_group_names (list[str]): Names of pain groups.
+            nr_components (int, optional): Limit to top N components.
+            use_distribution (bool, optional): Whether to filter by distribution_info.
+            distribution_type (str, optional): Distribution type to filter on if use_distribution=True.
 
         Returns:
             pd.DataFrame | None: DataFrame of rotated PC scores matching the criteria.
         """
-        placeholders = ','.join(['?'] * len(pain_group_names)) 
+        placeholders = ','.join(['?'] * len(pain_group_names))
+
+        distribution_clause = ""
+        distribution_param = []
+        if use_distribution:
+            distribution_clause = "AND distribution_info = ?"
+            distribution_param = [distribution_type]
+
         if nr_components is not None:
             query = f"""
                 WITH top_pcs AS (
                     SELECT pc_id
                     FROM [Participants PCs]
-                    WHERE
-                    distribution_info = 'normal_distribution' 
-                    AND exp_id = ? 
+                    WHERE exp_id = ? 
                     AND device = ? 
                     AND meas_time_point = ?
                     AND pain_groups IN ({placeholders})
+                    {distribution_clause}
                     AND (
                         rotation_type != 'unrotated'
                         OR (
@@ -104,7 +115,7 @@ class PCScoresRepository(BaseRepository):
                 WHERE pc_id IN (SELECT pc_id FROM top_pcs)
                 ORDER BY ABS(t_value) DESC
             """
-            params = [exp_id, device, meas_timepoint] + pain_group_names + [nr_components]
+            params = [exp_id, device, meas_timepoint] + pain_group_names + distribution_param + [nr_components]
         else:
             query = f"""
                 SELECT *
@@ -113,6 +124,7 @@ class PCScoresRepository(BaseRepository):
                 AND device = ? 
                 AND meas_time_point = ? 
                 AND pain_groups IN ({placeholders})
+                {distribution_clause}
                 AND (
                     rotation_type != 'unrotated'
                     OR (
@@ -126,11 +138,13 @@ class PCScoresRepository(BaseRepository):
                 )
                 ORDER BY ABS(t_value) DESC
             """
-            params = [exp_id, device, meas_timepoint] + pain_group_names
+            params = [exp_id, device, meas_timepoint] + pain_group_names + distribution_param
 
         return self.get_raw_query(query, params)
-    
-    def get_unrotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, pain_group_names:list[str], nr_components:int | None =None) -> pd.DataFrame:
+        
+
+    def get_unrotated_pc_scores(self, exp_id:int, device:str, meas_timepoint:str, pain_group_names:list[str], nr_components:int | None =None,
+                                use_distribution: bool = False, distribution_type: str | None = "normal_distribution") -> pd.DataFrame:
         """
         Retrieves unrotated PC scores from the 'Participants PCs' table, optionally limited by number of components.
 
@@ -143,18 +157,26 @@ class PCScoresRepository(BaseRepository):
         Returns:
             pd.DataFrame | None: DataFrame of unrotated PC scores matching the criteria.
         """
+        # TODO: adjust the selection for distribution here
         placeholders = ','.join(['?'] * len(pain_group_names))
+        
+        distribution_clause = ""
+        distribution_param = []
+        if use_distribution:
+            distribution_clause = "AND distribution_info = ?"
+            distribution_param = [distribution_type]
+        
         if nr_components is not None:
             query = f"""
                 WITH top_pcs AS (
                     SELECT pc_id
                     FROM [Participants PCs]
                     WHERE 
-                    distribution_info = 'normal_distribution' 
                     AND exp_id = ? 
                     AND device = ? 
                     AND meas_time_point = ?
                     AND pain_groups IN ({placeholders})
+                    {distribution_clause}
                     AND rotation_type = 'unrotated'
                     GROUP BY pc_id
                     ORDER BY MAX(ABS(t_value)) DESC
@@ -165,7 +187,7 @@ class PCScoresRepository(BaseRepository):
                 WHERE pc_id IN (SELECT pc_id FROM top_pcs)
                 ORDER BY ABS(t_value) DESC
             """
-            params = [exp_id, device, meas_timepoint] + pain_group_names + [nr_components]
+            params = [exp_id, device, meas_timepoint] + pain_group_names + distribution_param + [nr_components]
         else:
             query = f"""
                 SELECT *
@@ -174,10 +196,11 @@ class PCScoresRepository(BaseRepository):
                 AND device = ?
                 AND meas_time_point = ?
                 AND pain_groups IN ({placeholders})
+                {distribution_clause}
                 AND rotation_type = 'unrotated'
                 ORDER BY ABS(t_value) DESC
             """
-            params = [exp_id, device, meas_timepoint] + pain_group_names
+            params = [exp_id, device, meas_timepoint] + pain_group_names + distribution_param
 
         return self.get_raw_query(query, params)
     

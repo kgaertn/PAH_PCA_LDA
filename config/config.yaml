@@ -1,14 +1,17 @@
 exp_name: 'mpa'
 device: "mocap"
-measurement_tp: 'post'
-pain_groups: ["all"]
+measurement_tp: 'pre'
+pain_groups: ["healthy", "shoulder_neck"]
 analysis:
-  check_requirements: False
+  check_requirements: True
   distributions_plotted: False
+  create_general_plots: False
+  check_ttest_distribution: True
   rotation_method: 'varimax'
   scaler_type: 'standard_scaler'
   nr_components: null
-  test_assumptions: True
-  assumptions_relevant: True
+  test_t_test_assumptions: True
+  t_test_assumptions_relevant: True
+  t_test_distribution_type: 'normal_distribution'
 database:
   path: "data/my_database.db"

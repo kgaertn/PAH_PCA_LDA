@@ -26,9 +26,17 @@ class AnalysisRunner:
             "measurement_tp": self.cfg.measurement_tp,
             "device": self.cfg.device,
             "pain_groups": self.cfg.pain_groups,
-            "nr_components": self.cfg.nr_components,
-            "scaler_type": self.cfg.scaler_type, 
+            "check_requirements" : self.cfg.check_requirements,
+            "distributions_plotted" : self.cfg.distributions_plotted,
+            "create_general_plots" : self.cfg.create_general_plots,
+            "check_ttest_distribution" : self.cfg.check_ttest_distribution,  
             "rotation_method": self.cfg.rotation_method,
+            "scaler_type": self.cfg.scaler_type, 
+            "nr_components": self.cfg.nr_components,
+            "create_general_plots" : self.cfg.create_general_plots,
+            "test_t_test_assumptions": self.cfg.test_t_test_assumptions,
+            "t_test_assumptions_relevant": self.cfg.t_test_assumptions_relevant,
+            "t_test_distribution_type": self.cfg.t_test_distribution_type
         }
         entry = self.logger.get_entry(key)
         
@@ -44,9 +52,12 @@ class AnalysisRunner:
                 if results is not None:
                 #self.logger.info(f"Handling results of {analysis.__class__.__name__}...")
                     analysis.handle_results(results, entry)
-                    
-                    if analysis.analysis_name == 'pca':
-                        analysis.reconstruct_results(key)
+               
+        for analysis in self.analyses:                    
+            if analysis.analysis_name == 'pca':
+                analysis.reconstruct_results(key)
+            elif analysis.analysis_name == 't_test':
+                results = analysis.reconstruct_results(key, entry)
                     #analysis._upload_step(entry, analysis.analysis_name, self.pca_runner.upload_pca_analysis, results)
 #
         #self.logger.info("All analyses completed.")
