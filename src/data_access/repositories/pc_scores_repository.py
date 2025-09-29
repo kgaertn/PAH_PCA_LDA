@@ -172,7 +172,7 @@ class PCScoresRepository(BaseRepository):
                     SELECT pc_id
                     FROM [Participants PCs]
                     WHERE 
-                    AND exp_id = ? 
+                    exp_id = ? 
                     AND device = ? 
                     AND meas_time_point = ?
                     AND pain_groups IN ({placeholders})

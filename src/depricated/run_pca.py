@@ -444,6 +444,7 @@ class PCARunner:
         Returns:
             dict: Rotation information including rotated loadings and scores.
         """
+        # TODO: check to not only include normal distribution
         pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution', rotation_type='unrotated')
         existing_target_axes = pca_df[['target', 'axis']].drop_duplicates().values.tolist()
         total_rotation_info = {}

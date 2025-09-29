@@ -15,10 +15,11 @@ import scipy.stats as st
 
 class TTestAnalyser(AbstractAnalyser):
     #TODO: see if run_rotated is necessary AND add information about whether or not to test for distribution
-    def __init__(self, cfg, logger):
+    def __init__(self, cfg, logger, run_rotated = False):
         super().__init__(cfg, logger)
-        self.analysis_name = 't_test'
+        self.analysis_name = 't_test' if not run_rotated else 't_test_rotated'
         self.cfg = cfg
+        self.run_rotated = run_rotated
         self.data_loader = DataLoader()
         self.data_processor = DataProcessor()
         self.data_plotter = DataPlotter()
@@ -48,22 +49,61 @@ class TTestAnalyser(AbstractAnalyser):
         pain_groups = key['pain_groups']
         rotation_method = key['rotation_method']
         distributions_plotted = key['distributions_plotted']
-                
-        pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, rotation_type=rotation_method)
-        pc_distribution_results= self.assumptions_tester.check_t_test_assumptions(pca_df, pain_groups, distributions_plotted)     
-        return pc_distribution_results  
+        
+        if self.run_rotated:
+            pca_df = self.data_loader.load_pc_data(exp_id=exp_id, device=device, meas_timepoint=measurement_tp, 
+                                                pain_groups=pain_groups, rotation_type= rotation_method)
+        else:
+            pca_df = self.data_loader.load_pc_data(exp_id=exp_id, device=device, meas_timepoint=measurement_tp, 
+                                    pain_groups=pain_groups)
+        pc_distribution_results= self.assumptions_tester.check_t_test_assumptions(pca_df, pain_groups, distributions_plotted)    
+        results = {
+            "pc_distribution_results": pc_distribution_results,
+            "key" : key
+        } 
+        return results  
 
     def handle_results(self, results, entry):
         """TODO"""
+        # t-test conduction should happen here and then be uploaded!
         #self.upload_pca_analysis(results)
-        self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.data_loader.upload_distribution_info, 
-                          result = results)
+        pc_distribution_results = results['pc_distribution_results']
+        key = results['key']
+
+
+
+        self._upload_step_no_logger_mark(
+            entry=entry,
+            analysis_name=self.analysis_name,
+            uploads=[
+                (self.data_loader.upload_distribution_info, pc_distribution_results)
+            ]
+        )
         
-    def reconstruct_results(self, key, entry):
-        """"""
-        results = self.conduct_t_test(key)
-        self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.data_loader.upload_t_test_results, 
-                    result = results)
+        t_test_results = self.conduct_t_test(key)
+        self._upload_step(
+            entry=entry,
+            analysis_name=self.analysis_name,
+            uploads=[
+                (self.data_loader.upload_t_test_results, t_test_results),
+            ]
+        )
+        
+        
+        
+        #pc_distribution_results = results['pc_distribution_results']
+        #key = results['key']
+        #
+        #self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.data_loader.upload_distribution_info, 
+        #                  result = pc_distribution_results)
+        #
+        #t_test_results = self.conduct_t_test(key)
+        #self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.data_loader.upload_t_test_results, 
+        #            result = t_test_results)
+        
+    #def reconstruct_results(self, key, entry):
+    #    """"""
+
             
     def conduct_t_test(self,key)-> pd.DataFrame:
         """
@@ -78,6 +118,7 @@ class TTestAnalyser(AbstractAnalyser):
         Returns:
             pd.DataFrame: T-test results and rankings.
         """
+        # TODO: make sure that rotations are not ALWAYS automatically included in loading the data
         exp_id = key['exp_id']
         device = key['device']
         measurement_tp = key['measurement_tp']
@@ -85,10 +126,16 @@ class TTestAnalyser(AbstractAnalyser):
         rotation_type = key['rotation_method']
         check_ttest_distribution = key['check_ttest_distribution']
         
-        if check_ttest_distribution:
-            pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution',rotation_type=rotation_type)
+        if self.run_rotated:
+            if check_ttest_distribution:
+                pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution', rotation_type=rotation_type)
+            else:
+                pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, rotation_type=rotation_type)
         else:
-            pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, rotation_type=rotation_type)
+            if check_ttest_distribution:
+                pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution', rotation_type='unrotated')
+            else:
+                pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, rotation_type='unrotated')
         
         t_test_results = self.rank_pcs(pca_df)
         return t_test_results

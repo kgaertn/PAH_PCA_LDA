@@ -12,7 +12,7 @@ class AnalysisRunner:
         self.logger = upload_logger
         self.analyses: List[AbstractAnalyser] = []
         # TODO: automize the steps
-        self.steps = ["pca", "distribution", "rotated_pcs", "rotated_distribution", "t_test"]
+        #self.steps = ["pca", "distribution", "rotated_pcs", "rotated_distribution", "t_test"]
 
     def register_analysis(self, analysis: AbstractAnalyser):
         """Add an analysis to the workflow."""
@@ -31,12 +31,19 @@ class AnalysisRunner:
             "create_general_plots" : self.cfg.create_general_plots,
             "check_ttest_distribution" : self.cfg.check_ttest_distribution,  
             "rotation_method": self.cfg.rotation_method,
-            "scaler_type": self.cfg.scaler_type, 
+            "pca_scaler_type": self.cfg.scaler_type, 
             "nr_components": self.cfg.nr_components,
             "create_general_plots" : self.cfg.create_general_plots,
             "test_t_test_assumptions": self.cfg.test_t_test_assumptions,
             "t_test_assumptions_relevant": self.cfg.t_test_assumptions_relevant,
-            "t_test_distribution_type": self.cfg.t_test_distribution_type
+            "t_test_distribution_type": self.cfg.t_test_distribution_type,
+            "lda_nr_components": self.cfg.lda_nr_components,
+            "lda_validation_type" : self.cfg.lda_validation_type,
+            "lda_splits": self.cfg.lda_splits,
+            "lda_scaler_type" : self.cfg.lda_scaler_type,
+            "lda_imputation_type" : self.cfg.lda_imputation_type,
+            "lda_imputer_parameter" : self.cfg.lda_imputer_parameter,
+            "lda_repeats" : self.cfg.lda_repeats
         }
         entry = self.logger.get_entry(key)
         
@@ -54,10 +61,10 @@ class AnalysisRunner:
                     analysis.handle_results(results, entry)
                
         for analysis in self.analyses:                    
-            if analysis.analysis_name == 'pca':
+            if analysis.analysis_name == 'pca' or analysis.analysis_name == 'pca_rotated' or analysis.analysis_name == 'lda' or analysis.analysis_name == 'lda_rotated':
                 analysis.reconstruct_results(key)
-            elif analysis.analysis_name == 't_test':
-                results = analysis.reconstruct_results(key, entry)
+            #elif analysis.analysis_name == 't_test' or analysis.analysis_name == 't_test_rotated':
+            #    results = analysis.reconstruct_results(key, entry)
                     #analysis._upload_step(entry, analysis.analysis_name, self.pca_runner.upload_pca_analysis, results)
 #
         #self.logger.info("All analyses completed.")

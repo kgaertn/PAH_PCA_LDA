@@ -9,6 +9,8 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 
+#from data_access.models.lda_results import LDAResults
+
 class DataPlotter:
     
     def __init__(self):
@@ -84,21 +86,21 @@ class DataPlotter:
     #        axs[0].plot(data, label=label, linestyle=linestyle,
     #                    color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
 
-        axs[0].set_title(title_waveform)
-        axs[0].set_xlabel("Normalized time (%)")
-        axs[0].set_ylabel("Amplitude (°)")
-        axs[0].legend(loc='upper right')
-        axs[0].grid(True)
-
-        # Loading vector
-        axs[1].plot(loading_vector, label="Loading Vector",
-                    color=self.get_color_for_label("loading"))
-        axs[1].set_title(title_loading)
-        axs[1].set_xlabel("Component Index")
-        axs[1].set_ylabel("Loading Value")
-        axs[1].grid(True)
-
-        return fig
+    #    axs[0].set_title(title_waveform)
+    #    axs[0].set_xlabel("Normalized time (%)")
+    #    axs[0].set_ylabel("Amplitude (°)")
+    #    axs[0].legend(loc='upper right')
+    #    axs[0].grid(True)
+#
+    #    # Loading vector
+    #    axs[1].plot(loading_vector, label="Loading Vector",
+    #                color=self.get_color_for_label("loading"))
+    #    axs[1].set_title(title_loading)
+    #    axs[1].set_xlabel("Component Index")
+    #    axs[1].set_ylabel("Loading Value")
+    #    axs[1].grid(True)
+#
+    #    return fig
     
     def get_color_for_label(self, label: str) -> str:
         """
@@ -120,7 +122,7 @@ class DataPlotter:
         return "#000000"
 
     def plot_PCA_reconstruction(self, component_data:dict, title_waveform:str="Mean Waveform", 
-                                title_loading:str="Loading Vector", y_max: float|None = None, y_min: float|None = None) -> matplotlib.figure.Figure:
+                                title_loading:str="Loading Vector", lv_ymax: float|None = None, lv_ymin: float|None = None) -> matplotlib.figure.Figure:
         """
         Plots the reconstructed mean waveforms with percentile bands and the corresponding 
         loading vector of a PCA component.
@@ -161,8 +163,9 @@ class DataPlotter:
             ("Upper Band No Pain", upper_band_nopain),
         ]
 
-        
+        # TODO: adjust ymin/ymax for reconstruction plots (equal for overall & group plots)
         fig, axs = plt.subplots(3, 1, figsize=(10, 12), constrained_layout=True)
+        all_values = []
         
         for label, data in labels_colors:
             linestyle = '-'
@@ -173,6 +176,7 @@ class DataPlotter:
 
             axs[0].plot(data, label=label, linestyle=linestyle,
                         color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
+            all_values.extend(data)
 
         for label, data in labels_colors_groups:
             linestyle = '-'
@@ -183,32 +187,44 @@ class DataPlotter:
 
             axs[1].plot(data, label=label, linestyle=linestyle,
                         color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
-    
+            all_values.extend(data)
         # Plot mean waveforms
         #axs[0].plot(mean_waveform_pain, label="Pain", color="blue")
         #axs[0].plot(mean_waveform_no_pain, label="No Pain", color="orange")
         #axs[0].plot(lower_band, label="Lower Band", linestyle='--', color="black")
         #axs[0].plot(upper_band, label="Upper Band", linestyle=':', color="black")
+        reconst_ymin, reconst_ymax = min(all_values), max(all_values)
+        reconst_yrange = reconst_ymax - reconst_ymin
+
+        reconst_padding = 0.1 * reconst_yrange
+       
         axs[0].set_title(title_waveform)
+        axs[0].set_ylim(reconst_ymin - reconst_padding, reconst_ymax + reconst_padding)
         axs[0].set_xlabel("Normalized time (%)")
-        axs[0].set_ylabel("Amplitude (°)")
+        axs[0].set_ylabel("Movement in Degrees (°)")
         axs[0].legend(loc='upper right')
         axs[0].grid(True)
         
         axs[1].set_title(title_waveform)
+        axs[1].set_ylim(reconst_ymin - reconst_padding, reconst_ymax + reconst_padding)
         axs[1].set_xlabel("Normalized time (%)")
-        axs[1].set_ylabel("Amplitude (°)")
+        axs[1].set_ylabel("Movement in Degrees (°)")
         axs[1].legend(loc='upper right')
         axs[1].grid(True)
         
         # Plot loading vector
+        lv_range = lv_ymax - lv_ymin
+        lv_padding = 0.1 * lv_range
+        max_lv_idx = np.argmax(np.abs(loading_vector))
         #axs[1].plot(loading_vector, color="green")
         axs[2].plot(loading_vector, label="Loading Vector",
             color=self.get_color_for_label("loading"))
+        axs[2].axvline(x=max_lv_idx, color='black', linestyle='--', label="Absolute Maximum", alpha=0.7)
         axs[2].set_title(title_loading)
         axs[2].set_xlabel("Component Index")
         axs[2].set_ylabel("Loading Value")
-        axs[2].set_ylim(y_min, y_max)
+        axs[2].set_ylim(lv_ymin - lv_padding, lv_ymax + lv_padding)
+        axs[2].legend(loc='upper right')
         axs[2].grid(True)
         plt.close(fig)
         return fig      
@@ -567,3 +583,44 @@ class DataPlotter:
         else:
             result = ' and '.join(pain_groups)
         return result
+    
+    @staticmethod
+    def plot_lda_boxlpots(df_cv_results, df_no_cv_results, column_names):
+        """"""
+        fig = plt.figure(figsize=(10, 10))
+        
+        df_cv_exploded = df_cv_results.apply(pd.Series.explode).reset_index(drop=True)
+        df_plot = df_cv_exploded.dropna(subset=[column_names[0]])
+        # Boxplot of CV results (blue)
+        #TODO: select the full list of values as y
+        sns.boxplot(
+            data=df_plot,
+            x="lda_nr_components",
+            y=column_names[0],
+            color="skyblue",
+            fill = False,
+            showfliers=False,
+            width=0.5
+        )
+       
+        box_width = 0.5
+        for i, row in df_no_cv_results.iterrows():
+            y = row[column_names[1]]  # list of values
+            x_center = i  # boxplot position (0-indexed)
+            plt.hlines(y=y, xmin=x_center - box_width/2, xmax=x_center + box_width/2, colors='red', linewidth=2)
+
+
+        # TODO: adjust titles and x/y labels
+        column_label = (
+            'Missclassification Error' if 'missclass' in column_names[0] 
+            else 'ROC AUC' if 'roc_auc' in column_names[0] 
+            else 'Accuracy'
+        )
+        
+        plt.xlabel("Number of Principal Components per LDA")
+        plt.ylabel(f"{column_label}")
+        plt.title(f"LDA {column_label} with Increasing PCs")
+        plt.legend()
+        plt.tight_layout()
+        return fig
+        #plt.show()

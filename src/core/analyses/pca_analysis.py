@@ -15,7 +15,7 @@ from factor_analyzer import Rotator
 class PCAAnalyser(AbstractAnalyser):
     def __init__(self, cfg, logger, run_rotated = False):
         super().__init__(cfg, logger)
-        self.analysis_name = 'pca'
+        self.analysis_name = 'pca' if not run_rotated else 'pca_rotated'
         self.cfg = cfg
         self.run_rotated = run_rotated
         self.data_loader = DataLoader()
@@ -41,8 +41,7 @@ class PCAAnalyser(AbstractAnalyser):
 
     def handle_results(self, results, entry):
         """"""
-        self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.upload_pca_analysis, 
-                          result = results)
+        self._upload_step(entry = entry, analysis_name=self.analysis_name , uploads=[(self.upload_pca_analysis, results)])
         
     def reconstruct_results(self, key):
         """"""
@@ -66,7 +65,7 @@ class PCAAnalyser(AbstractAnalyser):
         measurement_tp = key['measurement_tp']
         pain_groups = key['pain_groups']
         check_requirements = key['check_requirements']
-        scaler_type = key['scaler_type']
+        scaler_type = key['pca_scaler_type']
         
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
         
@@ -130,8 +129,8 @@ class PCAAnalyser(AbstractAnalyser):
         measurement_tp = key['measurement_tp']
         pain_groups = key['pain_groups']
         check_requirements = key['check_requirements']
-        scaler_type = key['scaler_type']
-        rotation_method = key['rotation_type']
+        scaler_type = key['pca_scaler_type']
+        rotation_method = key['rotation_method']
         
         pca_df = self.data_loader.load_pc_data(exp_id, device, measurement_tp, pain_groups, 'normal_distribution', rotation_type='unrotated')
         existing_target_axes = pca_df[['target', 'axis']].drop_duplicates().values.tolist()
@@ -157,7 +156,7 @@ class PCAAnalyser(AbstractAnalyser):
                 }
                 rotated_loadings = self.rotate_pc_loadings(loading_vectors, method = rotation_method )
             
-                df_sorted, _  = self.load_data_for_pca(exp_id, device,measurement_tp, target, axis, participant_ids)
+                df_sorted, _  = self.load_data_for_pca(key, target, axis, participant_ids)
                 df_transformed = self.process_data_for_pca(df_sorted)
                 df_outliers_removed, _ = self.check_and_remove_outliers(df_transformed)
                 df_part, df_pca = df_outliers_removed.iloc[:, :-202], df_outliers_removed.iloc[:, -202:]
@@ -502,7 +501,7 @@ class PCAAnalyser(AbstractAnalyser):
         measurement_tp = key['measurement_tp']
         pain_groups = key['pain_groups']
         nr_components = key['nr_components']
-        scaler_type = key['scaler_type']
+        scaler_type = key['pca_scaler_type']
         rotation_type = key['rotation_method']
         t_test_assumptions_relevant = key['t_test_assumptions_relevant']
         t_test_distribution_type = key['t_test_distribution_type']
@@ -542,10 +541,12 @@ class PCAAnalyser(AbstractAnalyser):
 
             # TODO: adjust the scaling of loading vector in the plots!
             # TODO: create only 1 plot for PCA reconstruction -> regular, per group, loading vector
-            fig = self.data_plotter.plot_PCA_reconstruction(component_reconstruction_data, title_reconstruction, title_loading_vector, y_max = overall_max, y_min = overall_min)
+            fig = self.data_plotter.plot_PCA_reconstruction(component_reconstruction_data, title_reconstruction, title_loading_vector, lv_ymax= overall_max, 
+                                                            lv_ymin= overall_min)
             
             distribution_label = f"{t_test_distribution_type}" if t_test_assumptions_relevant else "no_distribution_tested"
             rotation_label = f"{rotation_type}" if select_rotated else "unrotated"
+            
             current_path = Path.cwd()
             output_path = current_path / "output" / "plots" / "PCA_Reconstruction" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
             output_path.mkdir(parents=True, exist_ok=True)

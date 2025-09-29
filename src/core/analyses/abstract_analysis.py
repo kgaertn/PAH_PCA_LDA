@@ -14,8 +14,25 @@ class AbstractAnalyser:
     
     def reconstruct_results():
         raise NotImplementedError("Please Implement this method")        
-    
-    def _upload_step(self, entry, analysis_name, upload_func, result):
+
+    def _upload_step(self, entry, analysis_name, uploads):
+        """
+        uploads: list of (upload_func, result) tuples
+        """
         if not self.logger.is_uploaded(entry, analysis_name):
-            upload_func(result)
+            for upload_func, result in uploads:
+                upload_func(result)
             self.logger.mark_uploaded(entry, analysis_name)
+    
+    def _upload_step_no_logger_mark(self, entry, analysis_name, uploads):
+        """
+        uploads: list of (upload_func, result) tuples
+        """
+        if not self.logger.is_uploaded(entry, analysis_name):
+            for upload_func, result in uploads:
+                upload_func(result)
+    
+    #def _upload_step(self, entry, analysis_name, upload_func, result):
+    #    if not self.logger.is_uploaded(entry, analysis_name):
+    #        upload_func(result)
+    #        self.logger.mark_uploaded(entry, analysis_name)

@@ -1,10 +1,10 @@
 exp_name: 'mpa'
 device: "mocap"
 measurement_tp: 'pre'
-pain_groups: ["healthy", "shoulder_neck"]
-analysis:
-  check_requirements: True
-  distributions_plotted: False
+pain_groups: ["all"]
+pca_analysis:
+  check_requirements: False
+  distributions_plotted: True
   create_general_plots: False
   check_ttest_distribution: True
   rotation_method: 'varimax'
@@ -13,5 +13,13 @@ analysis:
   test_t_test_assumptions: True
   t_test_assumptions_relevant: True
   t_test_distribution_type: 'normal_distribution'
+lda_analysis:
+  lda_nr_components: 10
+  lda_validation_type: 'strat_group_k_fold'
+  lda_splits: 3
+  lda_scaler_type: 'standard_scaler'
+  lda_imputation_type: 'iterative_imputer'
+  lda_imputer_parameter: 1
+  lda_repeats: 100
 database:
   path: "data/my_database.db"

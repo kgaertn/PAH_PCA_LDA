@@ -8,6 +8,7 @@ from data_access.repositories.sample_repository import SampleRepository
 from data_access.repositories.datapoint_repository import DatapointRepository
 from data_access.repositories.rotation_repository import RotationRepository
 from data_access.repositories.pain_group_repository import PainGroupRepository
+from data_access.repositories.lda_repository import LDARepository
 from data_access.models.scaler import Scaler
 from data_access.models.pc_ranked import PC_Ranked
 from data_access.models.pc_scores import PC_Scores
@@ -33,6 +34,7 @@ class DataLoader:
         self.pc_scores_repo = PCScoresRepository()
         self.rot_repo = RotationRepository()
         self.pain_group_repo = PainGroupRepository()
+        self.lda_repo = LDARepository()
         
     def upload_distribution_info(self, pc_distributions:list[PC_Ranked]):
         """
@@ -120,7 +122,7 @@ class DataLoader:
         self.pc_scores_repo.insert_many_pc_scores(pc_scores)
         
     def load_pc_data(self, exp_id:int, device:str, meas_timepoint:str, pain_groups:list[str], distribution_info:str | None = None, 
-                     rotation_type:str | None = "unrotated") -> pd.DataFrame:
+                     rotation_type:str | None = 'unrotated') -> pd.DataFrame:
         """
         Load principal component scores for a given experiment, device, and measurement timepoint.
 
@@ -425,3 +427,76 @@ class DataLoader:
     
     def get_experiment_by_name(self, exp_name):
         return self.exp_repo.get_experiment_id_by_name(exp_name)
+    
+    def load_lda(self,exp_id:int, device:str, measurement_tp:str, pain_groups:list[str], pca_scaled:bool, select_rotated:bool, 
+                    rotation_type:str, imputation_type:str, lda_scaler_type, lda_validation_type) -> pd.DataFrame:
+        """"""
+        
+    #def load_pcs_by_rank(self, exp_id:int, device:str, meas_tp:str, pain_groups:list[str], nr_components:int | None = None, select_rotated:bool = False, 
+    #                     use_distribution: bool = False, distribution_type: str | None = "normal_distribution"):
+        """
+        Load principal components ordered by rank, optionally selecting rotated components.
+
+        Args:
+            exp_id: Experiment ID
+            device: Device name
+            meas_tp: Measurement timepoint
+            nr_components (int | None): Number of components to load (optional)
+            select_rotated (bool): Whether to load rotated PCs (default False)
+
+        Returns:
+            pd.DataFrame: DataFrame of selected principal components
+        """
+        pain_group_names = [", ".join(pain_groups), ", ".join(reversed(pain_groups))]
+
+        if select_rotated:
+            rotation_type = rotation_type
+        else: 
+            rotation_type = 'unrotated'
+
+            df = self.lda_repo.get_lda_results(exp_id, device, measurement_tp, pain_group_names, pca_scaled, rotation_type, imputation_type, 
+                                   lda_scaler_type, lda_validation_type)
+        return df
+    
+    def upload_lda_pcs(self, lda_id:int, pc_ids:list[int]):
+        """
+        Associate a LDA with pc_ids.
+
+        Args:
+            lda_id (int): Principal component ID.
+            pc_ids list(int): Pain group ID.
+        """
+        self.lda_repo.insert_lda_pcs(lda_id, pc_ids)
+        
+    def upload_lda_analysis(self, lda):
+        """
+        Associate a LDA with pc_ids.
+
+        Args:
+            lda_id (int): Principal component ID.
+            pc_ids list(int): Pain group ID.
+        """
+        return self.lda_repo.insert_new_lda(lda)
+    
+    def check_full_lda_uploaded(self, key, run_rotated):
+        exp_id = key['exp_id']
+        device = key['device']
+        meas_timepoint = key['measurement_tp']
+        pain_groups = key['pain_groups']
+        pain_group_names = [", ".join(pain_groups), ", ".join(reversed(pain_groups))]
+        pca_scaled = True if key['pca_scaler_type'] != None else False
+        rotation_type = key['rotation_method'] if run_rotated else "unrotated"
+        scaler_type = key['lda_scaler_type']
+        imputer_type = key['lda_imputation_type']
+        imputer_parameter = key['lda_imputer_parameter']
+        validation_type = 'no_validation'
+        n_folds = key['lda_splits']
+        n_repeats = key['lda_repeats']
+        
+        uploaded_ldas = self.lda_repo.get_lda_results(exp_id = exp_id, device = device, measurement_tp = meas_timepoint, pain_group_names = pain_group_names, pca_scaled= pca_scaled, 
+                                                      rotation_type = rotation_type, lda_imputation_type = imputer_type, lda_scaler_type = scaler_type, lda_validation_type = validation_type)
+        
+        if uploaded_ldas is None:
+            return False
+        else: return True
+    

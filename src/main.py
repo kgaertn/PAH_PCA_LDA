@@ -1,19 +1,19 @@
 from core.analysis_runner import AnalysisRunner
 from core.analyses.pca_analysis import PCAAnalyser
-#from core.analyses.lda_analysis import LDAAnalysis
+from core.analyses.lda_analysis import LDAAnalyser
 from core.analyses.ttest_analysis import TTestAnalyser
 from core.analyses.general_analysis import GeneralAnalyser
-
 #from core.run_pca import PCARunner
 #from core.analyses.general_analysis import GeneralAnalysisRunner
 #from models.analysis_config import AnalysisConfig
+
 from config_loader import ConfigLoader
 from upload_logger import UploadLogger
 from core.analysis_runner import AnalysisRunner
 from data_access.db.setup import db_setup
 from pathlib import Path
-import yaml
-import json
+#import yaml
+#import json
 
 
 def main():
@@ -28,7 +28,7 @@ def main():
     cfg = ConfigLoader.load(Path(__file__).resolve().parent.parent /  "config" / "config.yaml")
 
     # Initialize logger and runner
-    steps = ["pca", "distribution", "rotated_pcs", "rotated_distribution", "t_test"]
+    steps = ["pca", "pca_rotated", "t_test_", "t_test_rotated", "lda", "lda_rotated"]
     logger = UploadLogger(Path(__file__).resolve().parent.parent /  "output" / "logs" / "analysis_log.json", steps)
 
     # Initialize your PCA runner (assume already implemented)
@@ -40,6 +40,9 @@ def main():
     runner.register_analysis(PCAAnalyser(cfg, logger))
     runner.register_analysis(TTestAnalyser(cfg, logger))
     runner.register_analysis(PCAAnalyser(cfg, logger, run_rotated=True))
+    runner.register_analysis(TTestAnalyser(cfg, logger, run_rotated=True))
+    runner.register_analysis(LDAAnalyser(cfg, logger))
+    #runner.register_analysis(LDAAnalyser(cfg, logger, run_rotated=True))
     runner.run()
 
     print("Analysis complete.")

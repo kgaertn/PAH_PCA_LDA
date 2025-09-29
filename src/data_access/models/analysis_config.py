@@ -17,3 +17,10 @@ class AnalysisConfig:
     test_t_test_assumptions: bool
     t_test_assumptions_relevant: bool
     t_test_distribution_type: str
+    lda_nr_components : int
+    lda_validation_type : str
+    lda_splits : int
+    lda_scaler_type : str
+    lda_imputation_type : str
+    lda_imputer_parameter : int|str
+    lda_repeats : int

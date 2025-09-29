@@ -2,6 +2,10 @@ import json
 from pathlib import Path
 
 class UploadLogger:
+    UNIQUE_KEYS = ["exp_id", "measurement_tp", "device", "pain_groups", "rotation_method", "lda_nr_components", "pca_scaler_type", "lda_validation_type", "lda_splits", 
+                   "lda_scaler_type", "lda_imputation_type", "lda_repeats"]
+
+    
     def __init__(self, log_path: str, steps: list):
         self.log_file = Path(log_path)
         self.log_file.parent.mkdir(exist_ok=True)
@@ -20,9 +24,12 @@ class UploadLogger:
             entry = {**analysis_key, "uploaded_steps": {step: False for step in self.steps}}
             self.run_log.append(entry)
         return entry
-
+    
     def _match(self, entry, key):
-        return all(entry[k] == key[k] for k in key)
+        return all(entry[k] == key[k] for k in self.UNIQUE_KEYS)
+
+    #def _match(self, entry, key):
+    #    return all(entry[k] == key[k] for k in key)
 
     def mark_uploaded(self, entry, step: str):
         entry["uploaded_steps"][step] = True

@@ -10,8 +10,10 @@ def db_setup():
     create_tables()
     add_columns_if_missing('datapoint', new_columns = {'sample_id': 'INTEGER'})
     create_adjusted_view()
+    create_samples_view()
     create_complete_datapoints_view()
     create_PCA_View()
+    create_LDA_View()
 
 def add_measurement_type_info():
     """
@@ -221,6 +223,38 @@ def create_tables():
             PRIMARY KEY (pc_id, pain_group_id)
         );
     """)  
+    
+    cursor.execute("""CREATE TABLE IF NOT EXISTS lda_results (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nr_components INT NOT NULL,
+        acc_values TEXT,
+        acc_mean FLOAT,
+        acc_sd FLOAT,
+        missclass_err_values TEXT,
+        missclass_err_mean FLOAT,
+        missclass_err_sd FLOAT,
+        roc_auc_values TEXT,
+        roc_auc_mean FLOAT,
+        roc_auc_sd FLOAT,
+        validation_type VARCHAR(50),
+        scaler_type VARCHAR(50),
+        imputation_type VARCHAR(50),
+        n_folds INT,
+        n_repeats INT
+        );
+    """)
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS lda_pc (
+            lda_id INTEGER NOT NULL,
+            pc_id INTEGER NOT NULL,
+            FOREIGN KEY (lda_id) REFERENCES lda_results(id),
+            FOREIGN KEY (pc_id) REFERENCES pcs_ranked(id),
+            PRIMARY KEY (lda_id, pc_id)
+        );
+    """)  
+    
+    
             
     # Add index on measurement_id in datapoint
     cursor.execute("""
@@ -233,6 +267,9 @@ def create_tables():
         CREATE INDEX IF NOT EXISTS idx_sample_measurement_id
         ON sample (measurement_id)
     """)
+    
+
+    
 
     conn.commit()
 
@@ -270,20 +307,38 @@ def create_adjusted_view():
     cursor = conn.cursor()
     cursor.execute("""
         CREATE VIEW IF NOT EXISTS datapoint_adjusted AS
-            SELECT
-                id,
-                measurement_id,
-                sample_id,
-                bow_stroke,
-                up_down,
-                key,
-                CASE
-                    WHEN up_down = 1 THEN time_point + 101
-                    ELSE time_point
-                END AS time_point, 
-                value
-            FROM datapoint
-            WHERE sample_id IS NOT NULL;
+                SELECT
+                    id,
+                    measurement_id,
+                    sample_id,
+                    bow_stroke,
+                    up_down,
+                    key,
+                    CASE
+                        WHEN up_down = 1 THEN time_point + 101
+                        ELSE time_point
+                    END AS time_point, 
+                    value
+                FROM datapoint
+                WHERE sample_id IS NOT NULL;
+    """)
+
+def create_samples_view():
+    """
+    Creates the 'samples_adjusted' view that shifts timepoints by 101 units when up_down=1
+    and includes only datapoints with valid sample_id.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE VIEW IF NOT EXISTS samples_adjusted AS
+                SELECT
+                    id,
+                    measurement_id,
+                    bow_stroke_start,
+                    bow_stroke_end,
+                    FLOOR(bow_stroke_start / 2) AS full_stroke
+                FROM sample;
     """)
      
 def create_complete_datapoints_view():
@@ -358,7 +413,8 @@ def create_PCA_View():
                 pcr.shap_wilk_w_no_pain, 
                 pcr.shap_wilk_p_pain, 
                 pcr.shap_wilk_p_no_pain, 
-                s.id AS sample_id, 
+                s.id AS sample_id,
+                s.full_stroke, 
                 pcs.pc_score
 
             FROM experiment e
@@ -367,13 +423,66 @@ def create_PCA_View():
             JOIN measurement_type mt ON m.measurement_type_id = mt.id
             JOIN pcs_ranked pcr ON mt.id = pcr.measurement_type_id
             JOIN pca_rotation AS rot ON pcr.rotation_id = rot.id
-            JOIN sample s ON m.id = s.measurement_id
+            JOIN samples_adjusted s ON m.id = s.measurement_id
             JOIN pc_scores pcs ON s.id = pcs.sample_id AND pcr.id = pcs.pc_id
             LEFT JOIN pain_groups_agg pg_agg ON pg_agg.pc_id = pcr.id
 
             WHERE mt.rotation_sequence NOT IN ('carrying_angle', 'redundant'); 
     """)
+    
+    
+def create_LDA_View():
+    """
+    Creates the 'Complete_LDA' view combining PCA-related data with pain group and participant information.
+    """
+    conn = get_connection()
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE VIEW IF NOT EXISTS "Complete_LDA" AS
+            WITH pain_groups_agg AS (
+                SELECT 
+                    prpg.pc_id,
+                    GROUP_CONCAT(pg.pain_type, ', ') AS pain_groups
+                FROM pcs_ranked_pain_group prpg
+                JOIN pain_group pg ON prpg.pain_group_id = pg.id
+                GROUP BY prpg.pc_id
+            )
 
+            SELECT DISTINCT
+                e.id AS exp_id, 
+                m.device, 
+                m.timepoint AS meas_time_point, 
+                pg_agg.pain_groups,  
+                pcr.data_scaled AS pca_scaled, 
+                rot.rotation_type AS pca_rotation_type,
+                lda.id AS lda_id,
+                lda.nr_components AS lda_nr_components,
+                lda.acc_values,
+                lda.acc_mean,
+                lda.acc_sd,
+                lda.missclass_err_values,
+                lda.missclass_err_mean,
+                lda.missclass_err_sd,
+                lda.roc_auc_values,
+                lda.roc_auc_mean,
+                lda.roc_auc_sd,
+                lda.validation_type AS lda_validation_type,
+                lda.scaler_type AS lda_scaler_type,
+                lda.imputation_type AS lda_imputation_type,
+                lda.n_folds,
+                lda.n_repeats
+
+            FROM experiment e
+            JOIN participant p ON p.experiment_id = e.id
+            JOIN measurement m ON m.participant_id = p.id
+            JOIN measurement_type mt ON m.measurement_type_id = mt.id
+            JOIN pcs_ranked pcr ON mt.id = pcr.measurement_type_id
+            JOIN pca_rotation AS rot ON pcr.rotation_id = rot.id
+            JOIN lda_pc AS lpc ON pcr.id = lpc.pc_id
+            JOIN lda_results lda ON lpc.lda_id = lda.id
+            LEFT JOIN pain_groups_agg pg_agg ON pg_agg.pc_id = pcr.id; 
+    """)
+    
 def fill_measurement_type_table():
     """
     Inserts distinct combinations of experiment_id, device, timepoint, target, and axis from the
