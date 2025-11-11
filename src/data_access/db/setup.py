@@ -258,6 +258,25 @@ def create_tables():
         );
     """)  
     
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS analysis_log (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            exp_id INTEGER NOT NULL,
+            measurement_tp TEXT NOT NULL,
+            device TEXT NOT NULL,
+            pain_groups TEXT NOT NULL,
+            analysis_name TEXT NOT NULL,
+            param_signature TEXT NOT NULL,
+            param_json TEXT NOT NULL,
+            status TEXT CHECK (status IN ('pending', 'success', 'failed')) DEFAULT 'success',
+            result_path TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (exp_id) REFERENCES experiment(id),
+            UNIQUE (exp_id, measurement_tp, device, pain_groups, analysis_name, param_signature)
+            
+        );
+    """) 
+    
     
             
     # Add index on measurement_id in datapoint

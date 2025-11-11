@@ -1,6 +1,6 @@
 from pathlib import Path
 import matplotlib
-#matplotlib.use('Agg')
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pandas.plotting import scatter_matrix
 from pandas.plotting import lag_plot

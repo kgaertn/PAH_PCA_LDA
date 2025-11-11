@@ -39,9 +39,9 @@ class PCAAnalyser(AbstractAnalyser):
             prepared_data = self.prepare_unrotated(key, target, axis)
         return prepared_data
 
-    def handle_results(self, params, results, entry):
+    def handle_results(self, exp_params, analysis_params, results):
         """"""
-        self._upload_step(params = params, entry = entry, analysis_name=self.analysis_name , uploads=[(self.upload_pca_analysis, results)])
+        self._upload_step(exp_params= exp_params, analysis_params = analysis_params, uploads=[(self.upload_pca_analysis, results)])
         
     def reconstruct_results(self, key):
         """"""

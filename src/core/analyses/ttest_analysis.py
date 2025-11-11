@@ -3,15 +3,9 @@ from processing.data_loading import DataLoader
 from processing.data_plotting import DataPlotter
 from processing.data_preprocess import DataProcessor
 from processing.assumptions_testing import AssumptionsTester
-#from data_access.models.pc_ranked import PC_Ranked # TODO: change, so that PC Ranked is only called from data processing level
-#
-#from pathlib import Path
-#import numpy as np
+
 import pandas as pd
 import scipy.stats as st
-#from sklearn.preprocessing import StandardScaler
-#from sklearn.decomposition import PCA
-#from factor_analyzer import Rotator
 
 class TTestAnalyser(AbstractAnalyser):
     #TODO: see if run_rotated is necessary AND add information about whether or not to test for distribution
@@ -63,19 +57,14 @@ class TTestAnalyser(AbstractAnalyser):
         } 
         return results  
 
-    def handle_results(self, params, results, entry):
-        """TODO"""
-        # t-test conduction should happen here and then be uploaded!
-        #self.upload_pca_analysis(results)
+    def handle_results(self, exp_params, analysis_params, results):
+        """"""
         pc_distribution_results = results['pc_distribution_results']
         key = results['key']
 
-
-
         self._upload_step(
-            params=params,
-            entry=entry,
-            analysis_name=self.analysis_name,
+            exp_params=exp_params,
+            analysis_params=analysis_params,
             uploads=[
                 (self.data_loader.upload_distribution_info, pc_distribution_results)
             ]
@@ -83,30 +72,13 @@ class TTestAnalyser(AbstractAnalyser):
         
         t_test_results = self.conduct_t_test(key)
         self._upload_step(
-            params = params,
-            entry=entry,
-            analysis_name=self.analysis_name,
+            exp_params=exp_params,
+            analysis_params=analysis_params,
             uploads=[
                 (self.data_loader.upload_t_test_results, t_test_results),
             ]
-        )
-        
-        
-        
-        #pc_distribution_results = results['pc_distribution_results']
-        #key = results['key']
-        #
-        #self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.data_loader.upload_distribution_info, 
-        #                  result = pc_distribution_results)
-        #
-        #t_test_results = self.conduct_t_test(key)
-        #self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.data_loader.upload_t_test_results, 
-        #            result = t_test_results)
-        
-    #def reconstruct_results(self, key, entry):
-    #    """"""
-
-            
+        )      
+           
     def conduct_t_test(self,key)-> pd.DataFrame:
         """
         Perform t-tests on PCA data to rank principal components.

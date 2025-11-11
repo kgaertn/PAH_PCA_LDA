@@ -320,9 +320,9 @@ class LDAAnalyser(AbstractAnalyser):
         
         return data_clean
     
-    def handle_results(self, params, results, entry):
+    def handle_results(self, exp_params, analysis_params, results):
         """"""
-        self._upload_step(params = params, entry = entry, analysis_name=self.analysis_name , uploads=[(self.upload_lda_analysis, results)])
+        self._upload_step(exp_params = exp_params, analysis_params = analysis_params, uploads=[(self.upload_lda_analysis, results)])
     
     def upload_lda_analysis(self, lda_results):
         """
