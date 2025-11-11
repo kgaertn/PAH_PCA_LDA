@@ -38,6 +38,8 @@ class UploaderService:
                 return FormatCleanMPAParser()
             elif "pain" in file_path.lower():
                 return FormatPainMPAParser()
+            elif "questionnaires" in file_path.lower():
+                return FormatQuestionnaireMPAParser()
             else:
                 raise ValueError(f"Unknown Excel-Format for file {file_path}")
         else:
@@ -173,7 +175,19 @@ class UploaderService:
         for participant in pain_data.get("participants", []):
             self.participant_repo.update_pain_data(participant, exp_id)
             
-    
+
+    def upload_questionnaire_data(self, file_path: str):
+        """
+        Upload pain-related data from a specified file and update participant pain data in the database.
+
+        Args:
+            file_path (str): Path to the pain data file.
+        """
+        parser = self._choose_parser(file_path)
+        pain_data = parser.parse(file_path)
+        exp_id = self.experiment_repo.get_experiment_id_by_name('mpa')
+        for participant in pain_data.get("participants", []):
+            self.participant_repo.update_demographic_data(participant, exp_id)  
         
         
         

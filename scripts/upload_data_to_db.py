@@ -18,14 +18,16 @@ def main():
     print("Database tables created.")
     
     project_root = Path(__file__).parent.parent 
-    mpa_data_folder = project_root / 'data/Sample_Data_PAH/MusikPhysioAnalysis'
+    mpa_data_folder = project_root / 'data/Sample Data PAH/MusikPhysioAnalysis'
     #raw_mpa_folder_mocap = mpa_data_folder / '00_VIOLIN/00_JOINT_ANGLE'
     clean_mpa_folder_mocap = mpa_data_folder / '00_VIOLIN/00_JOINT_ANGLE/output'
     #raw_mpa_folder_emg = mpa_data_folder / '00_VIOLIN/00_JOINT_ANGLE'
     clean_mpa_folder_emg = mpa_data_folder / '00_VIOLIN/01_EMG/output'
+    mpa_questionnaire_folde = mpa_data_folder /'NB MPA Data Analysis/Analysis/00_questionnaires/high_strings'
     
+    mpa_pain_data =  mpa_data_folder / 'Measurement Protocols' / 'PRMD_High_Strings_Subgroups_Pain.xlsx'
     
-    mpa_pain_data =  mpa_data_folder / 'PRMD_High_Strings_Subgroups_Pain.xlsx'
+    mpa_questionnaire_data = mpa_questionnaire_folde / 'MPA_Fragebögen_Daten_hohe Streicher_20190313.xlsx'
 
     # TODO: Layers wieder sauber trennen: wie erkennen, dass alle dateien schon in der DB sind? 
     exp_repo = ExperimentRepository()
@@ -39,6 +41,8 @@ def main():
         uploader.upload(data_folders)
         
     uploader.upload_mpa_pain(str(mpa_pain_data))
+    uploader.upload_questionnaire_data(str(mpa_questionnaire_data))
+    
     add_measurement_type_info()
     
     data_processor = DataProcessor()

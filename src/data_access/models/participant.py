@@ -7,6 +7,7 @@ class Participant:
     id: int | str
     participant_id: str
     experiment_id: int | str
+    sex: Optional[str] = None
     age: Optional[int] = None
     height_cm: Optional[float] = None
     weight_kg: Optional[float] = None

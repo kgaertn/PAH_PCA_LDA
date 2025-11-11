@@ -51,7 +51,8 @@ def create_tables():
         CREATE TABLE IF NOT EXISTS participant (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             experiment_id INTEGER,
-            participant_id TEXT,
+            participant_id TEXT, 
+            sex TEXT,
             age INTEGER,
             height_cm REAL,
             weight_kg REAL,
@@ -240,7 +241,10 @@ def create_tables():
         scaler_type VARCHAR(50),
         imputation_type VARCHAR(50),
         n_folds INT,
-        n_repeats INT
+        n_repeats INT,
+        lda_scores TEXT,
+        lda_scalings TEXT,
+        lda_class_means TEXT
         );
     """)
     
@@ -470,7 +474,10 @@ def create_LDA_View():
                 lda.scaler_type AS lda_scaler_type,
                 lda.imputation_type AS lda_imputation_type,
                 lda.n_folds,
-                lda.n_repeats
+                lda.n_repeats, 
+                lda.lda_scores,
+                lda.lda_scalings,
+                lda.lda_class_means
 
             FROM experiment e
             JOIN participant p ON p.experiment_id = e.id

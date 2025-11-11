@@ -22,6 +22,9 @@ class LDAResults:
     imputation_type: str
     n_folds: int | None
     n_repeats: int | None
+    lda_scores: list[dict] | None = None 
+    lda_scalings: list[list[float]] | None = None
+    lda_class_means: list[list[float]] | None = None
     
     def values_to_json(self, values) -> str:
         """Return the mean values as a JSON string."""

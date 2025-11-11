@@ -1,9 +1,10 @@
 from pathlib import Path
 import matplotlib
-matplotlib.use('Agg')
+#matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pandas.plotting import scatter_matrix
 from pandas.plotting import lag_plot
+from matplotlib.lines import Line2D
 import matplotlib.figure
 import seaborn as sns
 import pandas as pd
@@ -228,6 +229,246 @@ class DataPlotter:
         axs[2].grid(True)
         plt.close(fig)
         return fig      
+
+    def plot_top_3_PCAs(self, orig_data:pd.DataFrame, component_data:dict, title_waveform:str="Mean Waveform", 
+                            title_loading:str="Loading Vector", lv_ymax: float|None = None, lv_ymin: float|None = None) -> matplotlib.figure.Figure:
+   
+        
+        fig, axes = plt.subplots(3, 3, figsize=(18, 15), constrained_layout=True)
+        all_values = []
+        all_loading_vectors = []
+        for i, rank in enumerate(component_data):
+            target = component_data[rank]['target']
+            target_clean = target.removesuffix("joint angle").strip()
+            axis = component_data[rank]['axis']
+            pc_index = component_data[rank]['pc_index']
+            rotation_sequence = component_data[rank]['rotation_sequence'].replace("_", " ")
+            mean_waveform_pain = component_data[rank]['component_data']['mean_waveform_pain']
+            mean_waveform_no_pain = component_data[rank]['component_data']['mean_waveform_no_pain']
+            lower_band = component_data[rank]['component_data']['lower_band']
+            upper_band = component_data[rank]['component_data']['upper_band']
+            #lower_band_pain = component_data['lower_band_pain']
+            #upper_band_pain = component_data['upper_band_pain']
+            #lower_band_nopain = component_data['lower_band_no_pain']
+            #upper_band_nopain = component_data['upper_band_no_pain']
+            loading_vector = component_data[rank]['component_data']['loading_vector']
+            all_loading_vectors.extend(loading_vector)
+                        
+            labels_colors = [
+                ("Pain", mean_waveform_pain),
+                ("No Pain", mean_waveform_no_pain),
+                ("Lower Band", lower_band),
+                ("Upper Band", upper_band),
+            ]  
+
+            df_target_axis = orig_data[(orig_data['target'] == target) & (orig_data['axis'] == axis)]
+            time_cols = sorted(
+                [col for col in df_target_axis.columns if col.startswith("t") and col[1:].isdigit()],
+                key=lambda c: int(c[1:])
+            )
+            time_points = [int(c[1:]) for c in time_cols]
+            df_mean = (
+                df_target_axis.groupby(["participant_id", "PRMD_ever"])[time_cols]
+                .mean()
+                .reset_index()
+            )
+            
+            ax = axes[0,i]
+            ax.set_title(target_clean + "\n" + rotation_sequence + "\nPC " + str(pc_index), fontsize = 20)
+            for _, row in df_mean.iterrows():
+                #color = "tab:red" if row["PRMD_ever"] == 1 else "tab:blue"
+                label = 'Pain' if row["PRMD_ever"] == 1 else "No Pain"
+                ax.plot(time_points, row[time_cols].values, color=self.get_color_for_label(label), alpha=1.0)
+            
+            ax = axes[1,i]  
+            ax.plot(loading_vector, label="Loading Vector", color=self.get_color_for_label("loading"))  
+            
+            ax = axes[2,i]  
+
+            
+            for label, data in labels_colors:
+                linestyle = '-'
+                if "Lower Band" in label:
+                    linestyle = '--'
+                elif "Upper Band" in label:
+                    linestyle = ':'
+
+                ax.plot(data, label=label, linestyle=linestyle,
+                            color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
+                all_values.extend(data)
+                
+            axes[0,i].tick_params(axis='both', which='major', labelsize=14)
+            axes[1,i].tick_params(axis='both', which='major', labelsize=14)
+            axes[2,i].tick_params(axis='both', which='major', labelsize=14)
+        
+        
+        lv_ymin = min(all_loading_vectors)
+        lv_ymax = max(all_loading_vectors)
+        reconst_lvrange = lv_ymax - lv_ymin
+        reconst_padding = 0.1 * reconst_lvrange
+        
+        #axes[1].set_title(title_waveform)
+        
+        #axes[0,1].set_title(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        #axes[0,2].set_title(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        
+        axes[1,0].set_ylim(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        axes[1,1].set_ylim(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        axes[1,2].set_ylim(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        axes[0,0].set_ylabel("Movement in Degrees (°)", fontsize = 16, labelpad = 10)
+        axes[2,0].set_ylabel("Movement in Degrees (°)", fontsize = 16, labelpad = 10)
+        axes[2,0].set_xlabel("Normalized time (%)", fontsize = 16, labelpad = 10)
+        axes[2,1].set_xlabel("Normalized time (%)", fontsize = 16, labelpad = 10)
+        axes[2,2].set_xlabel("Normalized time (%)", fontsize = 16, labelpad = 10)
+
+        
+        fig.text(0.04, 0.78, 'Raw \nwaveforms', va='center', rotation='horizontal', fontsize=14, fontweight='bold')
+        fig.text(0.04, 0.5, 'PC \nLoading vector', va='center', rotation='horizontal', fontsize=14, fontweight='bold')
+        fig.text(0.04, 0.22, 'Single PC \nreconstruction', va='center', rotation='horizontal', fontsize=14, fontweight='bold')
+        plt.tight_layout(rect=[0.05, 0, 1, 1])    
+            #axes[1].set_title(title_waveform)
+            #axes[1].set_ylim(reconst_ymin - reconst_padding, reconst_ymax + reconst_padding)
+            #axes[1].set_xlabel("Normalized time (%)")
+            #axes[1].set_ylabel("Movement in Degrees (°)")
+            #axes[1].legend(loc='upper right')
+            #axes[1].grid(True)
+            
+        return fig
+    
+    def plot_top_3_PCAs_reduced(self, orig_data:pd.DataFrame, component_data:dict, title_waveform:str="Mean Waveform", 
+                            title_loading:str="Loading Vector", lv_ymax: float|None = None, lv_ymin: float|None = None) -> matplotlib.figure.Figure:
+   
+        #TODO: adjust scaling for the plots (same PCA -> same scaling!)     
+        fig, axes = plt.subplots(2, 3, figsize=(18, 10), constrained_layout=True)
+        all_values = []
+        all_loading_vectors = []
+        for i, rank in enumerate(component_data):
+            target = component_data[rank]['target']
+            target_clean = target.removesuffix("joint angle").strip()
+            axis = component_data[rank]['axis']
+            pc_index = component_data[rank]['pc_index']
+            rotation_sequence = component_data[rank]['rotation_sequence'].replace("_", " ")
+            mean_waveform_pain = component_data[rank]['component_data']['mean_waveform_pain']
+            mean_waveform_no_pain = component_data[rank]['component_data']['mean_waveform_no_pain']
+            lower_band = component_data[rank]['component_data']['lower_band']
+            upper_band = component_data[rank]['component_data']['upper_band']
+            #lower_band_pain = component_data['lower_band_pain']
+            #upper_band_pain = component_data['upper_band_pain']
+            #lower_band_nopain = component_data['lower_band_no_pain']
+            #upper_band_nopain = component_data['upper_band_no_pain']
+            loading_vector = component_data[rank]['component_data']['loading_vector']
+            all_loading_vectors.extend(loading_vector)
+                        
+            labels_colors = [
+                ("Pain", mean_waveform_pain),
+                ("No Pain", mean_waveform_no_pain),
+                ("Lower Band", lower_band),
+                ("Upper Band", upper_band),
+            ]  
+
+            df_target_axis = orig_data[(orig_data['target'] == target) & (orig_data['axis'] == axis)]
+            time_cols = sorted(
+                [col for col in df_target_axis.columns if col.startswith("t") and col[1:].isdigit()],
+                key=lambda c: int(c[1:])
+            )
+            time_points = [int(c[1:]) for c in time_cols]
+            df_mean = (
+                df_target_axis.groupby(["participant_id", "PRMD_ever"])[time_cols]
+                .mean()
+                .reset_index()
+            )
+            
+            ax = axes[0,i]
+            ax.set_title(target_clean + "\n" + rotation_sequence + "\nPC " + str(pc_index), fontsize = 20)
+            for _, row in df_mean.iterrows():
+                #color = "tab:red" if row["PRMD_ever"] == 1 else "tab:blue"
+                label = 'Pain' if row["PRMD_ever"] == 1 else "No Pain"
+                ax.plot(time_points, row[time_cols].values, color=self.get_color_for_label(label), alpha=1.0)
+            
+            ax = axes[1,i]  
+            #ax.plot(loading_vector, label="Loading Vector", color=self.get_color_for_label("loading"))  
+            
+            #ax = axes[2,i]  
+
+            
+            for label, data in labels_colors:
+                linestyle = '-'
+                if "Lower Band" in label:
+                    linestyle = '--'
+                elif "Upper Band" in label:
+                    linestyle = ':'
+
+                ax.plot(data, label=label, linestyle=linestyle,
+                            color=self.get_color_for_label(label), alpha=0.7 if "Band" in label else 1.0)
+                all_values.extend(data)
+            
+            y_min = df_mean[time_cols].to_numpy().min()
+            y_max = df_mean[time_cols].to_numpy().max()
+            range = y_max - y_min
+            padding = 0.1 * range
+            
+            axes[0,i].set_ylim(y_min - padding, y_max + padding)
+            axes[1,i].set_ylim(y_min - padding, y_max + padding)
+                
+            axes[0,i].tick_params(axis='both', which='major', labelsize=14)
+            axes[1,i].tick_params(axis='both', which='major', labelsize=14)
+            #axes[2,i].tick_params(axis='both', which='major', labelsize=14)
+        
+        
+        #lv_ymin = min(all_loading_vectors)
+        #lv_ymax = max(all_loading_vectors)
+        #reconst_lvrange = lv_ymax - lv_ymin
+        #reconst_padding = 0.1 * reconst_lvrange
+        
+        #axes[1].set_title(title_waveform)
+        
+        #axes[0,1].set_title(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        #axes[0,2].set_title(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        
+        #axes[1,0].set_ylim(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        #axes[1,1].set_ylim(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        #axes[1,2].set_ylim(lv_ymin - reconst_padding, lv_ymax + reconst_padding)
+        axes[0,0].set_ylabel("Movement in Degrees (°)", fontsize = 16, labelpad = 10)
+        axes[1,0].set_ylabel("Movement in Degrees (°)", fontsize = 16, labelpad = 10)
+        axes[1,0].set_xlabel("Normalized time (%)", fontsize = 16, labelpad = 10)
+        axes[1,1].set_xlabel("Normalized time (%)", fontsize = 16, labelpad = 10)
+        axes[1,2].set_xlabel("Normalized time (%)", fontsize = 16, labelpad = 10)
+
+        
+        fig.text(0.04, 0.725, 'Raw \nwaveforms', va='center', rotation='horizontal', fontsize=14, fontweight='bold')
+        #fig.text(0.04, 0.5, 'PC \nLoading vector', va='center', rotation='horizontal', fontsize=14, fontweight='bold')
+        fig.text(0.04, 0.29, 'Single PC \nreconstruction', va='center', rotation='horizontal', fontsize=14, fontweight='bold')
+        plt.tight_layout(rect=[0.05, 0, 1, 1])    
+            #axes[1].set_title(title_waveform)
+            #axes[1].set_ylim(reconst_ymin - reconst_padding, reconst_ymax + reconst_padding)
+            #axes[1].set_xlabel("Normalized time (%)")
+            #axes[1].set_ylabel("Movement in Degrees (°)")
+            #axes[1].legend(loc='upper right')
+            #axes[1].grid(True)
+            
+        return fig
+        # Definierte Labels
+
+        
+        #for label, data in labels_colors:
+        #    linestyle = '-'
+        #    if "Lower Band" in label:
+        #        linestyle = '--'
+        #    elif "Upper Band" in label:
+        #        linestyle = ':'
+        
+        
+        #axes = axes.flatten()
+            #target_axis_unique = orig_data[['target', 'axis']].drop_duplicates()
+            #for i, target, axis in enumerate(target_axis_unique):
+            #    df_target_axis = orig_data[(orig_data['target'] == target) & (orig_data['axis'] == axis)]
+            #    time_cols = [col for col in df_target_axis.columns if col.startswith("t")]
+            #    time_points = [int(c[1:]) for c in time_cols]
+            #    ax = axes[0,i]
+            #    for _, row in df_target_axis.iterrows():
+            #        #color = "tab:red" if row["PRMD_ever"] == 1 else "tab:blue"
+            #        ax.plot(time_points, row[time_cols].values, color=self.get_color_for_label(label), alpha=0.3)
+            
 
     #def plot_PCA_reconstruction(self, component_data:dict, title_waveform:str="Mean Waveform", 
     #                            title_loading:str="Loading Vector") -> matplotlib.figure.Figure:
@@ -587,7 +828,7 @@ class DataPlotter:
     @staticmethod
     def plot_lda_boxlpots(df_cv_results, df_no_cv_results, column_names):
         """"""
-        fig = plt.figure(figsize=(10, 10))
+        fig, ax = plt.subplots(figsize=(10, 10))
         
         df_cv_exploded = df_cv_results.apply(pd.Series.explode).reset_index(drop=True)
         df_plot = df_cv_exploded.dropna(subset=[column_names[0]])
@@ -597,17 +838,18 @@ class DataPlotter:
             data=df_plot,
             x="lda_nr_components",
             y=column_names[0],
-            color="skyblue",
+            color="#5B8E7D",
             fill = False,
             showfliers=False,
-            width=0.5
+            width=0.5,
+            ax = ax
         )
        
         box_width = 0.5
         for i, row in df_no_cv_results.iterrows():
             y = row[column_names[1]]  # list of values
             x_center = i  # boxplot position (0-indexed)
-            plt.hlines(y=y, xmin=x_center - box_width/2, xmax=x_center + box_width/2, colors='red', linewidth=2)
+            plt.hlines(y=y, xmin=x_center - box_width/2, xmax=x_center + box_width/2, colors='#BC4B51', linewidth=2)
 
 
         # TODO: adjust titles and x/y labels
@@ -617,10 +859,192 @@ class DataPlotter:
             else 'Accuracy'
         )
         
-        plt.xlabel("Number of Principal Components per LDA")
-        plt.ylabel(f"{column_label}")
-        plt.title(f"LDA {column_label} with Increasing PCs")
+        ax.set_xlabel("Number of Principal Components per LDA", fontsize = 30, labelpad = 10)
+        ax.set_ylabel(f"{column_label}", fontsize = 30, labelpad = 10)
+        #ax.set_title(f"LDA {column_label} with Increasing PCs")
+        ax.set_ylim(0.0,1.0)
+        ax.tick_params(axis='both', which='major', labelsize=24)
+        #plt.xlabel("Number of Principal Components per LDA")
+        #plt.ylabel(f"{column_label}")
+        #plt.title(f"LDA {column_label} with Increasing PCs")
         plt.legend()
         plt.tight_layout()
         return fig
         #plt.show()
+        
+    def plot_lda_class_distribution_from_row(self, df_row):
+        """
+        Visualize class separation from LDA results stored in DB.
+        Works directly with saved lda_scores, lda_scalings, lda_class_means.
+        Returns a matplotlib Figure.
+        """
+        
+        row = df_row.iloc[0]
+        if row["lda_scores"] is None:
+            print("⚠️ No LDA scores available.")
+            return None
+    
+        scores = row["lda_scores"]
+        df_lda = pd.DataFrame(scores)
+        scalings = row["lda_scalings"]
+        class_means = row["lda_class_means"]
+
+        # ---- 2️⃣ Project class means into discriminant space ----
+        # (lda_class_means are in feature space, so project them using lda_scalings)
+        projected_means = np.dot(class_means, scalings)
+
+        # ---- 3️⃣ Plot the KDEs ----
+        fig, ax = plt.subplots(figsize=(8, 5))
+        unique_classes = df_lda["class"].unique()
+        
+        class_label_map = {0: "no_pain", 1: "pain"}
+        class_colors = {cls: self.COLOR_MAP[class_label_map[cls]] for cls in df_lda["class"].unique()}
+        
+        kde_handles, kde_labels = ax.get_legend_handles_labels()
+        # ---- 2️⃣ Plot KDE without palette dictionary, use colors via hue mapping ----
+        sns.kdeplot(
+            data=df_lda,
+            x="LD1",
+            hue="class",
+            fill=True,
+            common_norm=False,
+            alpha=0.5,
+            linewidth=1.5,
+            ax=ax,
+            palette=[class_colors[cls] for cls in sorted(df_lda["class"].unique())]
+        )
+        class_centers = df_lda.groupby("class")["LD1"].mean()
+
+        mean_handles = []
+        for cls, mean_val in class_centers.items():
+            line = ax.axvline(
+                mean_val,
+                color=class_colors[cls],
+                linestyle="--",
+                linewidth=2
+            )
+            mean_handles.append(line)
+        # ---- 4️⃣ Overlay vertical lines for projected means ----
+        #for i, mean_val in class_centers.items():
+        #    ax.axvline(mean_val, color="k", linestyle="--", label=f"Mean class {i}")
+
+        # ---- 5️⃣ Label and return ----
+        legend_handles = [
+            Line2D([0], [0], color=class_colors[cls], lw=3, label=class_label_map[cls])
+            for cls in class_centers.keys()
+        ] + [
+            Line2D([0], [0], color=class_colors[cls], lw=2, linestyle="--", label=f"{class_label_map[cls]} mean")
+            for cls in class_centers.keys()
+        ]
+
+        ax.legend(handles=legend_handles, loc="best")
+
+        # ---- 6️⃣ Labels and grid ----
+        #ax.set_title(
+        #    f"LDA Class Separation (LD1)\nLDA components: {row['lda_nr_components']}", fontsize = 16
+        #)
+        ax.set_xlabel("LD1 (Discriminant Function 1)", fontsize = 16, labelpad = 10)
+        ax.set_ylabel("Density", fontsize = 16, labelpad = 10)
+        ax.tick_params(axis='both', which='major', labelsize=14)
+        ax.grid(True, linestyle="--", alpha=0.4)
+        fig.tight_layout()
+
+        return fig
+            
+    def plot_lda_class_separation(self, df, lda_means=None):
+        """
+        Visualize LDA separation (LD1 vs LD2) from stored lda_scores.
+        """
+# ---- 1️⃣ Extract JSON fields from the single row ----
+        row = df.iloc[0]
+
+        # Load lda_scores (list of dicts)
+        if row["lda_scores"] is None:
+            print("⚠️ No LDA scores found in this row.")
+            return None
+
+        try:
+            lda_scores = row["lda_scores"]
+            df_lda = pd.DataFrame(lda_scores)
+        except Exception as e:
+            print(f"⚠️ Could not parse lda_scores: {e}")
+            return None
+
+        # ---- 2️⃣ Basic validation ----
+        if "LD1" not in df_lda.columns:
+            print("⚠️ LDA scores do not include LD1/LD2 columns.")
+            return None
+
+        # ---- 3️⃣ Extract class means if available ----
+        lda_means = None
+        if "lda_class_means" in row and row["lda_class_means"] is not None:
+            try:
+                lda_means = (
+                    row["lda_class_means"]
+                )
+            except Exception as e:
+                print(f"⚠️ Could not parse lda_class_means: {e}")
+                lda_means = None
+
+        # ---- 4️⃣ Create figure and axis ----
+        fig, ax = plt.subplots(figsize=(8, 6))
+
+        if "LD2" in df_lda.columns:
+            sns.scatterplot(
+                data=df_lda,
+                x="LD1",
+                y="LD2",
+                hue="class",
+                palette="Set1",
+                s=70,
+                alpha=0.8,
+                edgecolor="k",
+                ax=ax,
+            )
+        else:
+            # Only one discriminant (e.g. binary LDA)
+            df_lda["y_dummy"] = 0  # so we can still visualize LD1 on x-axis
+            sns.stripplot(
+                data=df_lda,
+                x="LD1",
+                y="y_dummy",
+                hue="class",
+                palette="Set1",
+                size=8,
+                alpha=0.8,
+                ax=ax,
+                jitter=True,
+            )
+            ax.set_yticks([])
+            ax.set_ylabel("")
+
+        # ---- 5️⃣ Add class means (centroids) ----
+        if lda_means is not None:
+            for i, mean_vec in enumerate(lda_means):
+                if len(mean_vec) >= 2:
+                    ax.scatter(
+                        mean_vec[0],
+                        mean_vec[1],
+                        color="black",
+                        marker="X",
+                        s=200,
+                        label=f"Mean class {i}",
+                    )
+
+        # ---- 6️⃣ Add metadata to title ----
+        title = (
+            f"LDA Class Separation ({row['device']}, {row['meas_time_point']})\n"
+            f"{row['pain_groups']} | {row['lda_nr_components']} PCs | {row['lda_validation_type']}"
+        )
+        ax.set_title(title)
+        ax.set_xlabel("LD1")
+        if "LD2" in df_lda.columns:
+            ax.set_ylabel("LD2")
+        else:
+            ax.set_ylabel("")
+
+        ax.legend()
+        ax.grid(True, linestyle="--", alpha=0.4)
+        fig.tight_layout()
+
+        return fig

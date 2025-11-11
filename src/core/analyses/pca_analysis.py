@@ -39,9 +39,9 @@ class PCAAnalyser(AbstractAnalyser):
             prepared_data = self.prepare_unrotated(key, target, axis)
         return prepared_data
 
-    def handle_results(self, results, entry):
+    def handle_results(self, params, results, entry):
         """"""
-        self._upload_step(entry = entry, analysis_name=self.analysis_name , uploads=[(self.upload_pca_analysis, results)])
+        self._upload_step(params = params, entry = entry, analysis_name=self.analysis_name , uploads=[(self.upload_pca_analysis, results)])
         
     def reconstruct_results(self, key):
         """"""
@@ -505,7 +505,7 @@ class PCAAnalyser(AbstractAnalyser):
         rotation_type = key['rotation_method']
         t_test_assumptions_relevant = key['t_test_assumptions_relevant']
         t_test_distribution_type = key['t_test_distribution_type']
-        
+               
         ranked_pc_scores_df = self.data_loader.load_pcs_by_rank(exp_id, device,measurement_tp,pain_groups, 
                                                                 nr_components= nr_components,select_rotated= select_rotated, 
                                                                 use_distribution= t_test_assumptions_relevant, distribution_type = t_test_distribution_type)
@@ -515,6 +515,9 @@ class PCAAnalyser(AbstractAnalyser):
         overall_min = ranked_pc_scores_df["loading_vector"].explode().min()
         overall_max = ranked_pc_scores_df["loading_vector"].explode().max()
         
+        #fig = self.data_plotter.plot_top_3_PCAs()
+        orig_data_top_3_components = pd.DataFrame()
+        top_3_components = {}
         for id, pc_id in enumerate(ranked_pc_scores_df['pc_id'].unique()):
             rank = id+1
             current_pc_df = ranked_pc_scores_df[ranked_pc_scores_df['pc_id'] == pc_id]
@@ -532,6 +535,13 @@ class PCAAnalyser(AbstractAnalyser):
             
             scaler, _ = self.data_loader.load_specific_scaler(measurement_type_id, scaler_type)
             component_reconstruction_data = self.reconstruct_single_component(current_pc_df, df_transformed, scaler)
+            if id <= 2:
+                top_3_components[f"Rank_{rank}"] = {"target": target,
+                                                    "axis": axis,
+                                                    "pc_index": current_pc_df['pc_index'].unique()[0],
+                                                    "rotation_sequence": df['rotation_sequence'].unique()[0],
+                                                    "component_data":component_reconstruction_data}
+                orig_data_top_3_components = pd.concat([orig_data_top_3_components, df_transformed])
             pc_name = "PC" + str(current_pc_df['pc_index'].unique()[0])
             rotated_suffix_title = " Rotated" if select_rotated else ""
             rotated_suffix_fname = "_Rotated" if select_rotated else ""
@@ -552,6 +562,20 @@ class PCAAnalyser(AbstractAnalyser):
             output_path.mkdir(parents=True, exist_ok=True)
             fig_name = f"{measurement_tp}{rotated_suffix_fname}_Rank_{rank}_{target}_{axis}_{pc_name}"
             self.data_plotter.save_plot(fig, output_path, fig_name)
+        
+        fig = self.data_plotter.plot_top_3_PCAs(orig_data_top_3_components, top_3_components)
+        current_path = Path.cwd()
+        output_path = current_path / "output" / "plots" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
+        output_path.mkdir(parents=True, exist_ok=True)
+        fig_name = f"{measurement_tp}{rotated_suffix_fname}_TOP_3_PCs"
+        self.data_plotter.save_plot(fig, output_path, fig_name)
+        
+        fig = self.data_plotter.plot_top_3_PCAs_reduced(orig_data_top_3_components, top_3_components)
+        current_path = Path.cwd()
+        output_path = current_path / "output" / "plots" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
+        output_path.mkdir(parents=True, exist_ok=True)
+        fig_name = f"{measurement_tp}{rotated_suffix_fname}_TOP_3_PCs_reduced"
+        self.data_plotter.save_plot(fig, output_path, fig_name)
             #plt.close()
             #fig = self.data_plotter.plot_PCA_reconstruction_per_group(component_reconstruction_data, title_reconstruction, title_loading_vector)
             #fig_name = f"{measurement_tp}{rotated_suffix_fname}_per_group_Rank_{rank}_{target}_{axis}_{pc_name}"

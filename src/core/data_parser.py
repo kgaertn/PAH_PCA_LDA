@@ -339,4 +339,47 @@ class FormatPainMPAParser:
         return {
             "participants": participants
         }
-    
+
+class FormatQuestionnaireMPAParser:
+   
+    def parse(self, file_path: str) -> dict:
+        """
+        Parse pain questionnaire data from Excel file into participant objects.
+
+        Args:
+            file_path (str): Path to the pain data Excel file.
+
+        Returns:
+            dict: Dictionary with key 'participants' containing list of Participant objects.
+        """
+        questionnaire_data = pd.read_excel(file_path)
+        
+        sex_mapping = {
+        0: 'male',
+        1: 'female'
+    }
+
+        questionnaire_data['Geschlecht'] = questionnaire_data['Geschlecht'].replace(sex_mapping)
+        
+        participants = []
+        for _,row in questionnaire_data.iterrows():
+            
+            if row[0]<10:
+                subject_id = 'P00' + str(row["ID"])
+            else:
+                subject_id = 'P0' + str(row["ID"])
+            
+            participant_ext_id = f"mpa_pain_{subject_id}"
+            participants.append(Participant(
+                id=participant_ext_id, 
+                participant_id=subject_id,
+                experiment_id='mpa_quest', 
+                sex = row['Geschlecht'], 
+                age = row['Alter'], 
+                height_cm = row['Größe'], 
+                weight_kg = row['Gewicht']
+            ))
+        
+        return {
+            "participants": participants
+        }    

@@ -43,6 +43,24 @@ class ParticipantRepository(BaseRepository):
                     "PRMD_upper_arm_left":participant.PRMD_upper_arm_left, "PRMD_ever":participant.PRMD_ever},
             where={"experiment_id": exp_id, "participant_id": participant.participant_id}
         )
+        
+    def update_demographic_data(self, participant: Participant, exp_id:int):
+        """
+        Updates pain-related data fields for a participant in the database.
+
+        This method uses a generic update function to set several PRMD pain columns
+        for the participant identified by experiment_id and participant_id.
+
+        Args:
+            participant (Participant): The Participant instance containing updated pain data.
+            exp_id (int): The experiment ID to which the participant belongs.
+        """
+        self.update(
+            table="participant",
+            values={"age": participant.age, "sex":participant.sex, "height_cm":participant.height_cm, 
+                    "weight_kg":participant.weight_kg},
+            where={"experiment_id": exp_id, "participant_id": participant.participant_id}
+        )
       
 # endregion Setter
 

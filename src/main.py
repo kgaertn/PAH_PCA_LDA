@@ -28,7 +28,7 @@ def main():
     cfg = ConfigLoader.load(Path(__file__).resolve().parent.parent /  "config" / "config.yaml")
 
     # Initialize logger and runner
-    steps = ["pca", "pca_rotated", "t_test_", "t_test_rotated", "lda", "lda_rotated"]
+    steps = ["pca", "pca_rotated", "t_test", "t_test_rotated", "lda", "lda_rotated"]
     logger = UploadLogger(Path(__file__).resolve().parent.parent /  "output" / "logs" / "analysis_log.json", steps)
 
     # Initialize your PCA runner (assume already implemented)
@@ -36,11 +36,11 @@ def main():
 
     # Run analysis
     runner = AnalysisRunner(cfg, logger)
-    runner.register_analysis(GeneralAnalyser(cfg, logger))
+    #runner.register_analysis(GeneralAnalyser(cfg, logger))
     runner.register_analysis(PCAAnalyser(cfg, logger))
-    runner.register_analysis(TTestAnalyser(cfg, logger))
-    runner.register_analysis(PCAAnalyser(cfg, logger, run_rotated=True))
-    runner.register_analysis(TTestAnalyser(cfg, logger, run_rotated=True))
+    #runner.register_analysis(TTestAnalyser(cfg, logger))
+    #runner.register_analysis(PCAAnalyser(cfg, logger, run_rotated=True))
+    #runner.register_analysis(TTestAnalyser(cfg, logger, run_rotated=True))
     runner.register_analysis(LDAAnalyser(cfg, logger))
     #runner.register_analysis(LDAAnalyser(cfg, logger, run_rotated=True))
     runner.run()

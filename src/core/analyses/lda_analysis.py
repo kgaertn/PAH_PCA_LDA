@@ -125,6 +125,30 @@ class LDAAnalyser(AbstractAnalyser):
                     roc_auc_full = roc_auc_score(PRMD_clean, pipe.predict_proba(pc_scores_clean)[:, 1])
                 except ValueError:
                     roc_auc_full = float("nan")
+                
+                #TODO: test this part!!
+                lda_scores = None
+                lda_scalings = None
+                lda_means = None
+                lda_step = pipe.named_steps.get("lineardiscriminantanalysis", None)
+                if lda_step is not None:
+                    try:
+                        lda_scores_arr = lda_step.transform(pc_scores_clean)
+                        # Store per-sample LD coordinates and labels
+                        lda_scores = [
+                            {
+                                "participant_id": int(pid),
+                                "class": int(cls),
+                                **{f"LD{i+1}": float(score[i]) for i in range(lda_scores_arr.shape[1])}
+                            }
+                            for pid, cls, score in zip(part_ids_clean, PRMD_clean, lda_scores_arr)
+                        ]
+
+                        # Optional: model-level coefficients
+                        lda_scalings = lda_step.scalings_.tolist() if hasattr(lda_step, "scalings_") else None
+                        lda_means = lda_step.means_.tolist() if hasattr(lda_step, "means_") else None
+                    except Exception as e:
+                        print(f"⚠️ Could not compute LDA transform: {e}")
                     
                 result = LDAResults(
                     id=0,
@@ -143,7 +167,10 @@ class LDAAnalyser(AbstractAnalyser):
                     scaler_type=scaler_type,
                     imputation_type=imputer_type,
                     n_folds=None,
-                    n_repeats=None
+                    n_repeats=None,
+                    lda_scores=lda_scores,
+                    lda_scalings=lda_scalings,
+                    lda_class_means=lda_means
                 )
 
                 all_results.append(result)            
@@ -206,7 +233,7 @@ class LDAAnalyser(AbstractAnalyser):
     def get_cross_validater(cv_type, n_fold, repitions):
         scalers = {'k_fold': KFold(n_splits=n_fold, shuffle=True, random_state=repitions),
                 'strat_k_fold' : StratifiedKFold(n_splits=n_fold, shuffle=True, random_state=repitions), 
-                'group_k_fold' : GroupKFold(n_splits=n_fold),
+                'group_k_fold' : GroupKFold(n_splits=n_fold, shuffle=True, random_state=repitions),
                 'strat_group_k_fold': StratifiedGroupKFold(n_splits=n_fold, shuffle=True, random_state=repitions),
                 'leave_one_out' : LeaveOneOut(),
                 'leave_one_group_out' : LeaveOneGroupOut(),
@@ -293,9 +320,9 @@ class LDAAnalyser(AbstractAnalyser):
         
         return data_clean
     
-    def handle_results(self, results, entry):
+    def handle_results(self, params, results, entry):
         """"""
-        self._upload_step(entry = entry, analysis_name=self.analysis_name , uploads=[(self.upload_lda_analysis, results)])
+        self._upload_step(params = params, entry = entry, analysis_name=self.analysis_name , uploads=[(self.upload_lda_analysis, results)])
     
     def upload_lda_analysis(self, lda_results):
         """
@@ -329,8 +356,29 @@ class LDAAnalyser(AbstractAnalyser):
         lda_results_full = self.data_loader.load_lda(exp_id, device, measurement_tp, pain_groups, pca_scaled, self.run_rotated, 
                                         rotation_type, imputation_type, lda_scaler_type, 'no_validation') 
         
-        self.plot_lda_results(lda_results_cv, lda_results_full)      
+        self.plot_lda_results(lda_results_cv, lda_results_full)   
+        k = lda_results_cv.loc[lda_results_cv["acc_mean"].idxmax()]['lda_nr_components']
+        self.plot_lda_class_separation(lda_results_full, k) 
         
+    def plot_lda_class_separation(self, df_lda, k):
+        rotation_label = df_lda['pca_rotation_type'].unique()[0]
+        pain_group_names = df_lda['pain_groups'].unique()[0]
+        lda_validation_label = df_lda['lda_validation_type'].unique()[0]
+        lda_imputation_label = df_lda['lda_imputation_type'].unique()[0]
+        measurement_tp = df_lda['meas_time_point'].unique()[0]
+        
+        df_class_seperation = df_lda[df_lda['lda_nr_components'] == k]
+        lda_means = df_class_seperation['lda_class_means']
+        fig = self.data_plotter.plot_lda_class_distribution_from_row(df_class_seperation)
+        
+        current_path = Path.cwd()
+        output_path = current_path / "output" / "plots" / "LDA_Class_Seperation" / f"{pain_group_names}" / f"{rotation_label}" / f"{lda_validation_label}" / f"{lda_imputation_label}"
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        fig_name = f"{measurement_tp}_LDA_Class_Seperation"
+        self.data_plotter.save_plot(fig, output_path, fig_name)
+        
+    
     def plot_lda_results(self, lda_results_cv, lda_results_full):
         column_names = ['missclass_err_values', 'missclass_err_mean']
         fig = self.data_plotter.plot_lda_boxlpots(lda_results_cv, lda_results_full, column_names)   

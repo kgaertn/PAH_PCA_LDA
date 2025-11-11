@@ -34,7 +34,10 @@ class LDARepository(BaseRepository):
             "scaler_type": lda.scaler_type,
             "imputation_type": lda.imputation_type, 
             "n_folds": lda.n_folds,
-            "n_repeats": lda.n_repeats
+            "n_repeats": lda.n_repeats,
+            "lda_scores": lda.values_to_json(lda.lda_scores),
+            "lda_scalings": lda.values_to_json(lda.lda_scalings),
+            "lda_class_means": lda.values_to_json(lda.lda_class_means)
         }
         return self.insert_one("lda_results", data)
 
@@ -99,7 +102,9 @@ class LDARepository(BaseRepository):
                     rows.at[index, 'acc_values'] = LDAResults.list_from_json(rows.loc[index, 'acc_values'])
                     rows.at[index, 'missclass_err_values'] = LDAResults.list_from_json(rows.loc[index, 'missclass_err_values'])
                     rows.at[index, 'roc_auc_values'] = LDAResults.list_from_json(rows.loc[index, 'roc_auc_values'])
-            
+                    rows.at[index, 'lda_scores'] = LDAResults.list_from_json(rows.loc[index, 'lda_scores'])
+                    rows.at[index, 'lda_scalings'] = LDAResults.list_from_json(rows.loc[index, 'lda_scalings'])
+                    rows.at[index, 'lda_class_means'] = LDAResults.list_from_json(rows.loc[index, 'lda_class_means'])
             return rows
             #    print("")
 

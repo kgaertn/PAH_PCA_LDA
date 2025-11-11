@@ -63,7 +63,7 @@ class TTestAnalyser(AbstractAnalyser):
         } 
         return results  
 
-    def handle_results(self, results, entry):
+    def handle_results(self, params, results, entry):
         """TODO"""
         # t-test conduction should happen here and then be uploaded!
         #self.upload_pca_analysis(results)
@@ -72,7 +72,8 @@ class TTestAnalyser(AbstractAnalyser):
 
 
 
-        self._upload_step_no_logger_mark(
+        self._upload_step(
+            params=params,
             entry=entry,
             analysis_name=self.analysis_name,
             uploads=[
@@ -82,6 +83,7 @@ class TTestAnalyser(AbstractAnalyser):
         
         t_test_results = self.conduct_t_test(key)
         self._upload_step(
+            params = params,
             entry=entry,
             analysis_name=self.analysis_name,
             uploads=[
