@@ -63,32 +63,49 @@ class LDAAnalyser(AbstractAnalyser):
             pc_ids = [int(column_name.split("pc")[-1]) for column_name in pc_id_columns]
             subset = prepared_data.iloc[:, :3+k]
             
-            if imputer == None:
-                clean_data = self.remove_missing_values(subset)
-                pc_scores_clean = np.array(clean_data.iloc[:, 3:3+k])
-                PRMD_clean = np.array(clean_data['PRMD_ever'])
-                part_ids_clean = np.array(clean_data['participant_id'])
-            else:
-                pc_scores_clean = np.array(subset.iloc[:, 3:3+k])
-                PRMD_clean = np.array(subset['PRMD_ever'])
-                part_ids_clean = np.array(subset['participant_id'])
+            if imputer is None:
+                # only drop rows if NO imputer exists
+                subset = self.remove_missing_values(subset)
+
+            pc_scores_clean = np.array(subset.iloc[:, 3:3+k])
+            PRMD_clean = np.array(subset['PRMD_ever'])
+            part_ids_clean = np.array(subset['participant_id'])
+            
+            #if imputer == None:
+            #    clean_data = self.remove_missing_values(subset)
+            #    pc_scores_clean = np.array(clean_data.iloc[:, 3:3+k])
+            #    PRMD_clean = np.array(clean_data['PRMD_ever'])
+            #    part_ids_clean = np.array(clean_data['participant_id'])
+            #else:
+            #    pc_scores_clean = np.array(subset.iloc[:, 3:3+k])
+            #    PRMD_clean = np.array(subset['PRMD_ever'])
+            #    part_ids_clean = np.array(subset['participant_id'])
             
             
             # Store *all* scores across repetitions
             acc_values_all = []
             roc_auc_values_all = []
+            feature_imp_all = []
 
             for rep in range(n_repeats):
                 #gkf = StratifiedGroupKFold(n_splits=n_folds, shuffle=True, random_state=rep)
                 cvf = self.get_cross_validater(validation_type, n_folds, rep)
                 scores = cross_validate(pipe, pc_scores_clean, PRMD_clean, cv=cvf, groups=part_ids_clean, 
-                                        scoring=["accuracy", "roc_auc"], error_score="raise")
-
+                                        scoring=["accuracy", "roc_auc"], error_score="raise", return_estimator=True)
+                coefs = np.array([est.named_steps['lineardiscriminantanalysis'].coef_[0] for est in scores['estimator']])
+                mean_feature_importance = np.mean(np.abs(coefs), axis=0)
+                
                 acc_values_all.extend(scores['test_accuracy'])
                 roc_auc_values_all.extend(scores['test_roc_auc'])
+                feature_imp_all.append(mean_feature_importance)
 
             acc_values_all = np.array(acc_values_all)
             roc_auc_values_all = np.array(roc_auc_values_all)
+            stacked_feat_values = np.vstack(feature_imp_all)
+            feature_imp_all_mean = np.nanmean(stacked_feat_values, axis=0)
+            feature_imp_all_sd = np.nanstd(stacked_feat_values, axis=0)
+            feature_description = pc_id_columns.to_list()
+            #feature_imp_all = np.array(roc_auc_values_all)
             error_values_all = 1 - acc_values_all
 
 
@@ -105,6 +122,10 @@ class LDAAnalyser(AbstractAnalyser):
                 roc_auc_values=roc_auc_values_all.tolist(),
                 roc_auc_mean=np.nanmean(roc_auc_values_all),
                 roc_auc_sd=np.nanstd(roc_auc_values_all),
+                stacked_feature_values = np.array(stacked_feat_values).tolist(),
+                feature_imp_mean = np.array(feature_imp_all_mean).tolist(),
+                feature_imp_sd= np.array(feature_imp_all_sd).tolist(),
+                feature_description = feature_description,
                 validation_type= validation_type,
                 scaler_type=scaler_type,
                 imputation_type=imputer_type,
@@ -133,7 +154,7 @@ class LDAAnalyser(AbstractAnalyser):
                 lda_step = pipe.named_steps.get("lineardiscriminantanalysis", None)
                 if lda_step is not None:
                     try:
-                        lda_scores_arr = lda_step.transform(pc_scores_clean)
+                        lda_scores_arr = pipe.transform(pc_scores_clean)
                         # Store per-sample LD coordinates and labels
                         lda_scores = [
                             {
@@ -163,6 +184,10 @@ class LDAAnalyser(AbstractAnalyser):
                     roc_auc_values=None,
                     roc_auc_mean=np.nanmean(roc_auc_full),
                     roc_auc_sd=None,
+                    stacked_feature_values=None,
+                    feature_imp_mean = None,
+                    feature_imp_sd= None,
+                    feature_description = None,
                     validation_type= 'no_validation',
                     scaler_type=scaler_type,
                     imputation_type=imputer_type,
@@ -175,44 +200,7 @@ class LDAAnalyser(AbstractAnalyser):
 
                 all_results.append(result)            
             
-            #pc_scores_clean, PRMD_clean, part_ids_clean = self.remove_missing_values(pc_scores_sub, df_PRMD, df_part_ids)
-            #scores = cross_val_score(lda, pc_scores_clean, PRMD_clean, cv=gkf, groups=part_ids_clean, scoring="accuracy", error_score="raise")
-            #scores = cross_validate(pipe, pc_scores_clean, PRMD_clean, cv=gkf, groups=part_ids_clean, scoring=["accuracy", "roc_auc"], error_score="raise")
-            #print("")
-            #accuracy_folds = scores['test_accuracy']
-            #error_folds = 1 - accuracy_folds 
-            #result = LDAResults(
-            #    id = 0,
-            #    pc_ids = pc_ids,
-            #    nr_components = k,
-            #    acc_values = accuracy_folds,
-            #    acc_mean = np.nanmean(accuracy_folds),
-            #    acc_sd = np.nanstd(accuracy_folds),
-            #    missclass_err_values = error_folds,
-            #    missclass_err_mean = np.nanmean(error_folds),
-            #    missclass_err_sd =  np.nanstd(error_folds),   
-            #    roc_auc_values =  scores['test_roc_auc'],
-            #    roc_auc_mean = np.nanmean(scores['test_roc_auc']),
-            #    roc_auc_sd = np.nanstd(scores['test_roc_auc']),
-            #    scaler_type = scaler_type,
-            #    imputation_type = imputer_type,
-            #    n_folds = n_folds
-            #)
-            #accuracy_folds = scores['test_accuracy']
-            #result['nr_variables (k)'] = k
-            #result["Accuracy_Mean"] = np.nanmean(accuracy_folds)
-            #result["Accuracy_SD"] = np.nanstd(accuracy_folds)
-            #error_folds = 1 - accuracy_folds 
-            #result["Missclass_Err_Mean"] = np.nanmean(error_folds)
-            #result["Missclass_Err_SD"] = np.nanstd(error_folds) 
-            #result['ROC_AUC_Mean'] = np.nanmean(scores['test_roc_auc'])
-            #result['ROC_AUC_SD'] = np.nanstd(scores['test_roc_auc'])
-            #all_results.append(result)
-
-        # Sort results by mean accuracy
-        #df_results = pd.DataFrame(all_results)
         return all_results
-        #sorted_results = sorted(results.items(), key=lambda x: x[1], reverse=True)
 
     @staticmethod
     def create_pipeline(scaler, imputer):
@@ -356,6 +344,7 @@ class LDAAnalyser(AbstractAnalyser):
         lda_results_full = self.data_loader.load_lda(exp_id, device, measurement_tp, pain_groups, pca_scaled, self.run_rotated, 
                                         rotation_type, imputation_type, lda_scaler_type, 'no_validation') 
         
+        self.plot_feature_importance(lda_results_cv)
         self.plot_lda_results(lda_results_cv, lda_results_full)   
         k = lda_results_cv.loc[lda_results_cv["acc_mean"].idxmax()]['lda_nr_components']
         self.plot_lda_class_separation(lda_results_full, k) 
@@ -377,7 +366,27 @@ class LDAAnalyser(AbstractAnalyser):
         
         fig_name = f"{measurement_tp}_LDA_Class_Seperation"
         self.data_plotter.save_plot(fig, output_path, fig_name)
+    
+    
+    def plot_feature_importance(self, lda_results_cv):
+        rotation_label = lda_results_cv['pca_rotation_type'].unique()[0]
+        pain_group_names = lda_results_cv['pain_groups'].unique()[0]
+        lda_validation_label = lda_results_cv['lda_validation_type'].unique()[0]
+        lda_imputation_label = lda_results_cv['lda_imputation_type'].unique()[0]
+        measurement_tp = lda_results_cv['meas_time_point'].unique()[0]
         
+        
+        # coefs: array of shape (n_folds, n_features)
+        for k in range(2, max(lda_results_cv['lda_nr_components'])+1):
+            lda_results_component = lda_results_cv[lda_results_cv['lda_nr_components'] == k]
+            fig = self.data_plotter.plot_feature_importance(lda_results_component)
+        
+            current_path = Path.cwd()
+            output_path = current_path / "output" / "plots" / "LDA_Feature_importance" / f"{pain_group_names}" / f"{rotation_label}" / f"{lda_validation_label}" / f"{lda_imputation_label}"
+            output_path.mkdir(parents=True, exist_ok=True)
+            
+            fig_name = f"{measurement_tp}_Components{k}_Feature_importance"
+            self.data_plotter.save_plot(fig, output_path, fig_name)
     
     def plot_lda_results(self, lda_results_cv, lda_results_full):
         column_names = ['missclass_err_values', 'missclass_err_mean']

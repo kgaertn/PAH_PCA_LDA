@@ -447,6 +447,55 @@ class DataPlotter:
             #axes[1].grid(True)
             
         return fig
+    
+    def plot_feature_importance(self, lda_results_component):
+        stacked_features = lda_results_component['stacked_feature_values'].to_list()
+        transposed = list(map(list, zip(*stacked_features[0])))
+        #mean_importance = lda_results_component['feature_imp_mean'].to_list()
+        #std_importance = lda_results_component['feature_imp_sd'].to_list()
+        features = lda_results_component['feature_description'].to_list()[0]
+
+        # Numeric positions for each bar
+        #x_pos = range(len(features))
+
+        # Create figure
+        fig = plt.figure(figsize=(10, 6))
+        plt.boxplot(transposed, labels=features)
+        #plt.bar(x_pos, mean_importance, yerr=std_importance, capsize=5)
+        plt.xticks(rotation=45, ha='right')
+        plt.ylabel('Mean Absolute Coefficient (Importance)')
+        plt.title('Feature Importance with LDA Coefficients Across CV Folds')
+        plt.tight_layout()
+
+        return fig
+    
+    #def plot_feature_importance(self, lda_results_component):
+    #    mean_importance = lda_results_component['feature_imp_mean'].to_list()
+    #    std_importance = lda_results_component['feature_imp_sd'].to_list()
+    #    #n_components = lda_results_component['lda_nr_components']
+    #    features = lda_results_component['feature_description'].to_list()
+    #    # Create list of feature indices (adjust as needed)
+    #    #features = list(range(1, n_components.iloc[0] + 1))  
+#
+    #    # Create figure
+    #    fig = plt.figure(figsize=(10, 6))
+    #    plt.bar(features, mean_importance, yerr=std_importance, capsize=5)
+    #    plt.xticks(features, rotation=45, ha='right')
+    #    plt.ylabel('Mean Absolute Coefficient (Importance)')
+    #    plt.title('Feature Importance with LDA Coefficients Across CV Folds')
+    #    plt.tight_layout()
+#
+    #    return fig
+    #    #plt.show()
+
+        ## Boxplot to show coefficients distribution
+        #plt.figure(figsize=(12, 6))
+        #sns.boxplot(data=np.abs(coefs), orient='h')
+        #plt.yticks(ticks=np.arange(len(features)), labels=features)
+        #plt.xlabel('Absolute Coefficient Value')
+        #plt.title('Distribution of Feature Importance Across CV Folds')
+        #plt.tight_layout()
+        #plt.show()
         # Definierte Labels
 
         
@@ -829,7 +878,7 @@ class DataPlotter:
     def plot_lda_boxlpots(df_cv_results, df_no_cv_results, column_names):
         """"""
         fig, ax = plt.subplots(figsize=(10, 10))
-        
+        df_cv_results = df_cv_results.drop(columns=['stacked_feature_values', 'feature_imp_mean', 'feature_imp_sd', 'feature_description'])
         df_cv_exploded = df_cv_results.apply(pd.Series.explode).reset_index(drop=True)
         df_plot = df_cv_exploded.dropna(subset=[column_names[0]])
         # Boxplot of CV results (blue)

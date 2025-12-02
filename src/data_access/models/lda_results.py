@@ -17,6 +17,10 @@ class LDAResults:
     roc_auc_values: List[float]  | None
     roc_auc_mean: float
     roc_auc_sd: float | None
+    stacked_feature_values: list[float]|None
+    feature_imp_mean: float | None
+    feature_imp_sd: float | None
+    feature_description: float | None
     validation_type : str | None
     scaler_type: str
     imputation_type: str

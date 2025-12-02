@@ -30,6 +30,10 @@ class LDARepository(BaseRepository):
             "roc_auc_values": lda.values_to_json(lda.roc_auc_values),
             "roc_auc_mean": lda.roc_auc_mean,
             "roc_auc_sd": lda.roc_auc_sd,
+            "stacked_feature_values": lda.values_to_json(lda.stacked_feature_values),
+            "feature_imp_mean": lda.values_to_json(lda.feature_imp_mean),
+            "feature_imp_sd": lda.values_to_json(lda.feature_imp_sd),
+            "feature_description": lda.values_to_json(lda.feature_description),
             "validation_type":lda.validation_type,
             "scaler_type": lda.scaler_type,
             "imputation_type": lda.imputation_type, 
@@ -102,12 +106,13 @@ class LDARepository(BaseRepository):
                     rows.at[index, 'acc_values'] = LDAResults.list_from_json(rows.loc[index, 'acc_values'])
                     rows.at[index, 'missclass_err_values'] = LDAResults.list_from_json(rows.loc[index, 'missclass_err_values'])
                     rows.at[index, 'roc_auc_values'] = LDAResults.list_from_json(rows.loc[index, 'roc_auc_values'])
+                    rows.at[index, 'stacked_feature_values'] = LDAResults.list_from_json(rows.loc[index, 'stacked_feature_values'])
+                    rows.at[index, 'feature_imp_mean'] = LDAResults.list_from_json(rows.loc[index, 'feature_imp_mean'])
+                    rows.at[index, 'feature_imp_sd'] = LDAResults.list_from_json(rows.loc[index, 'feature_imp_sd'])
+                    rows.at[index, 'feature_description'] = LDAResults.list_from_json(rows.loc[index, 'feature_description'])
                     rows.at[index, 'lda_scores'] = LDAResults.list_from_json(rows.loc[index, 'lda_scores'])
                     rows.at[index, 'lda_scalings'] = LDAResults.list_from_json(rows.loc[index, 'lda_scalings'])
                     rows.at[index, 'lda_class_means'] = LDAResults.list_from_json(rows.loc[index, 'lda_class_means'])
             return rows
-            #    print("")
-
-        
 
 # endregion Getter

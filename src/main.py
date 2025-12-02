@@ -3,6 +3,7 @@ from core.analyses.pca_analysis import PCAAnalyser
 from core.analyses.lda_analysis import LDAAnalyser
 from core.analyses.ttest_analysis import TTestAnalyser
 from core.analyses.general_analysis import GeneralAnalyser
+from core.analyses.statistical_analysis import StatisticalAnalyser
 
 from config_loader import ConfigLoader
 from upload_logger import UploadLogger
@@ -34,6 +35,7 @@ def main():
     runner.register_analysis(PCAAnalyser(cfg, logger, run_rotated=True))
     runner.register_analysis(TTestAnalyser(cfg, logger, run_rotated=True))
     runner.register_analysis(LDAAnalyser(cfg, logger))
+    runner.register_analysis(StatisticalAnalyser(cfg,logger))
     #runner.register_analysis(LDAAnalyser(cfg, logger, run_rotated=True))
     runner.run()
 

@@ -87,8 +87,9 @@ class AnalysisRunner:
                 results = analysis.run(key)
                 if results is not None:
                     analysis.handle_results(exp_params, analysis_params, results)
-                    self.analysis_tracker.record_analysis(exp_params, analysis_params)
-                    #self.logger.mark_uploaded(entry, analysis.analysis_name, params)
+                    if analysis.analysis_name != "statistical":
+                        self.analysis_tracker.record_analysis(exp_params, analysis_params)
+                        #self.logger.mark_uploaded(entry, analysis.analysis_name, params)
 
         for analysis in self.analyses:                    
             if analysis.analysis_name == 'pca' or analysis.analysis_name == 'pca_rotated' or analysis.analysis_name == 'lda' or analysis.analysis_name == 'lda_rotated':
