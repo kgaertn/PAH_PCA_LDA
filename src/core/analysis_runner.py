@@ -68,27 +68,48 @@ class AnalysisRunner:
 #
         for analysis in self.analyses:
             #self.logger.info(f"Preparing {analysis.__class__.__name__}...")
-#           # TODO:adjust to the new saving structure
             exp_params = {k: key[k] for k in exp_keys}
             exp_params["analysis_name"] = analysis.analysis_name
             if analysis.analysis_name == "pca" or analysis.analysis_name == "pca_rotated" or analysis.analysis_name == "t_test" or analysis.analysis_name == "t_test_rotated":
-                analysis_params = {k: key[k] for k in pca_keys}  # only keys that affect analysis1
+                analysis_params = {k: key[k] for k in pca_keys}  # only keys that affect analysis
                 dependencies = None
             elif analysis.analysis_name == "lda" or analysis.analysis_name == "lda_rotated":
                 analysis_params = {k: key[k] for k in lda_keys}  # keys for analysis2
                 dependencies = {"pca": {k: key[k] for k in pca_keys}}
             else:
-                analysis_params = exp_params  # only keys that affect analysis1
-                dependencies = None       
-            if not self.analysis_tracker.has_been_analyzed(exp_params, analysis_params):
-                
-            #if not self.logger.is_uploaded(entry, analysis.analysis_name, params, dependencies):
-                ##self.logger.info(f"Running {analysis.__class__.__name__}...")
-                results = analysis.run(key)
-                if results is not None:
-                    analysis.handle_results(exp_params, analysis_params, results)
-                    if analysis.analysis_name != "statistical":
-                        self.analysis_tracker.record_analysis(exp_params, analysis_params)
+                analysis_params = exp_params  # only keys that affect analysis
+                dependencies = None   
+            
+            was_analysed = False
+            if 'pca' in analysis.analysis_name or 't_test' in analysis.analysis_name: # TODO: check if this is also true for general analyser
+                for tp in self.cfg.measurement_tp:
+                    exp_params_pca = exp_params
+                    exp_params_pca['measurement_tp'] = tp
+                    for device in self.cfg.device:
+                        exp_params_pca['device'] = device
+                        was_analysed = self.analysis_tracker.has_been_analyzed(exp_params_pca, analysis_params)
+                        if not was_analysed:
+                            key_pca = key
+                            key_pca['measurement_tp'] = tp
+                            key_pca['device'] = device
+                            results = analysis.run(key_pca)
+                            if results is not None:
+                                analysis.handle_results(exp_params_pca, analysis_params, results)
+                                self.analysis_tracker.record_analysis(exp_params_pca, analysis_params)
+            else:
+                #TODO!!! (Anpassen auf mehrere devices)
+                was_analysed = self.analysis_tracker.has_been_analyzed(exp_params, analysis_params)
+                if not was_analysed:
+                    
+                #if not self.logger.is_uploaded(entry, analysis.analysis_name, params, dependencies):
+                    ##self.logger.info(f"Running {analysis.__class__.__name__}...")
+                    
+                    #TODO: adjust device key, if it's just one (so it doesn't have to be done in a later step)
+                    results = analysis.run(key)
+                    if results is not None:
+                        analysis.handle_results(exp_params, analysis_params, results)
+                        if analysis.analysis_name != "statistical":
+                            self.analysis_tracker.record_analysis(exp_params, analysis_params)
                         #self.logger.mark_uploaded(entry, analysis.analysis_name, params)
 
         for analysis in self.analyses:                    

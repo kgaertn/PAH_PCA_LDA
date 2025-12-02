@@ -1,12 +1,12 @@
 exp_name: 'mpa'
-device: "mocap"
-measurement_tp: 'pre'
+device: ["mocap"]
+measurement_tp: ['pre']
 pain_groups: ["healthy", "shoulder_neck"]
 pca_analysis:
   check_requirements: False
   distributions_plotted: True
   create_general_plots: False
-  check_ttest_distribution: True
+  check_ttest_distribution: False
   rotation_method: 'varimax'
   scaler_type: 'standard_scaler'
   nr_components: null

@@ -392,7 +392,7 @@ def create_complete_datapoints_view():
             JOIN measurement m ON m.participant_id = p.id
             JOIN datapoint_adjusted d ON d.measurement_id = m.id
             JOIN measurement_type mt ON m.measurement_type_id = mt.id
-            WHERE mt.rotation_sequence NOT IN ('carrying_angle', 'redundant');
+            WHERE (mt.rotation_sequence NOT IN ('carrying_angle', 'redundant') OR mt.rotation_sequence IS NULL);
     """)
     
 def create_PCA_View():
@@ -454,7 +454,7 @@ def create_PCA_View():
             JOIN pc_scores pcs ON s.id = pcs.sample_id AND pcr.id = pcs.pc_id
             LEFT JOIN pain_groups_agg pg_agg ON pg_agg.pc_id = pcr.id
 
-            WHERE mt.rotation_sequence NOT IN ('carrying_angle', 'redundant'); 
+            WHERE (mt.rotation_sequence NOT IN ('carrying_angle', 'redundant') OR mt.rotation_sequence IS NULL); 
     """)
     
     

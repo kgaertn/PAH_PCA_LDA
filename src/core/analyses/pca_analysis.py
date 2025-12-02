@@ -28,6 +28,7 @@ class PCAAnalyser(AbstractAnalyser):
             pca_info = self.run_pca_unrotated(key)
         else:
             pca_info = self.run_pca_rotated(key)
+                    
         
         return pca_info
     
@@ -106,7 +107,7 @@ class PCAAnalyser(AbstractAnalyser):
                     'rotation_type' : 'unrotated'              
                 }
             })
-        return total_pca_info
+        return total_pca_info if total_pca_info != {} else None  
     
     def run_pca_rotated(self, key):
         # TODO: improve this function (make it slimmer, less complex and check dependencies)                
@@ -137,7 +138,10 @@ class PCAAnalyser(AbstractAnalyser):
         total_rotation_info = {}
         for target, axis in existing_target_axes:
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
-            df_target_axis = pca_df[(pca_df['target'] == target) & (pca_df['axis'] == axis)]
+            if not pca_df['axis'].isna().all():
+                df_target_axis = pca_df[(pca_df['target'] == target) & (pca_df['axis'] == axis)]
+            else:
+                df_target_axis = pca_df[(pca_df['target'] == target)]
             loading_vector_json = df_target_axis['loading_vector'].drop_duplicates().values
             loading_vectors = []
             for component in loading_vector_json:
@@ -192,7 +196,7 @@ class PCAAnalyser(AbstractAnalyser):
                         'pain_group_ids' : pain_group_ids, 
                         'rotation_type' :  rotation_method             
                     }})
-        return total_rotation_info    
+        return total_rotation_info if total_rotation_info != {} else None  
           
     def prepare_unrotated(self, key, target, axis):
         """"""
@@ -248,7 +252,12 @@ class PCAAnalyser(AbstractAnalyser):
             'value'
         ]]
         df_sorted = df_reduced.sort_values(by=['participant_id', 'bow_stroke', 'up_down', 'dp_time_point'])  
-        df_sorted_transformed = self.data_processor.pivot_full_cycles_to_wide(df_sorted, 'value','dp_time_point')
+        if axis != None:
+            df_sorted_transformed = self.data_processor.pivot_full_cycles_to_wide(df_sorted, 'value','dp_time_point')
+        else:
+            df_sorted_transformed = self.data_processor.pivot_full_cycles_to_wide(df_sorted, 'value','dp_time_point', 
+                                                                                  index_cols = ["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 
+                                                                                    'target', "sample_id"])
           
         return df_sorted, df_sorted_transformed
         
@@ -270,6 +279,7 @@ class PCAAnalyser(AbstractAnalyser):
         key_cont_corr_mat = self.assumptions_tester.check_pca_requirements(df_transformed.iloc[:, -202:])
         key_cont_fig_corr_mat = self.assumptions_tester.plot_pca_requirements(key_cont_corr_mat, target, axis)
         self.data_plotter.save_plot(key_cont_fig_corr_mat, output_path, f"Mean_Subt_Data_Correlation_matrix_{target}_{axis}")
+        
 
     def scale_df(self, df:pd.DataFrame, scaler_type:str) -> tuple[pd.DataFrame, dict]:
         """
@@ -355,7 +365,12 @@ class PCAAnalyser(AbstractAnalyser):
         """
         # TODO: save mean key per target/axis? / plot mean key? 
         df_key_normalized = self.data_processor.subtract_meanwave_key_difference(df_sorted)
-        df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_key_normalized, 'value_centered','dp_time_point')
+        if df_key_normalized['axis'].isna().all():
+            df_transformed = self.data_processor.pivot_full_cycles_to_wide(df=df_key_normalized, value='value_centered',pivot_column='dp_time_point',
+                                                                           index_cols = ["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 
+                                                'target', "sample_id"])
+        else:
+            df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_key_normalized, 'value_centered','dp_time_point')
         return df_transformed
     
     def check_and_remove_outliers(self, df:pd.DataFrame) -> tuple[pd.DataFrame, int]:
@@ -391,7 +406,7 @@ class PCAAnalyser(AbstractAnalyser):
         output_path = current_path / "output" / "plots" / "Linearity_plots" / f"{pain_group_names}"
         output_path.mkdir(parents=True, exist_ok=True)
         self.data_plotter.save_plot(fig1, output_path, f"Scatter_matrix_{target}_{axis}")
-        self.data_plotter.save_plot(fig2, output_path, f"Lag_plot_{target}_{axis}") 
+        self.data_plotter.save_plot(fig2, output_path, f"Lag_plot_{target}_{axis}")       
         
     @staticmethod
     def standardize_df(df:pd.DataFrame) -> tuple[np.ndarray, StandardScaler]:

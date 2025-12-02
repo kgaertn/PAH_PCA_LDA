@@ -28,9 +28,13 @@ class AssumptionsTester:
             List[PC_Ranked]: List of PC_Ranked instances with distribution test results.
         """
         # TODO: split the plotting from the rest of the assumptions testing
-        df_mean = df.groupby(['target', 'axis', 'pc_index', 'pc_id', 'participant_id', 'PRMD_ever'])['pc_score'].mean().reset_index()
-        meas_time_point = df['meas_time_point'][0]     
+        if not df['axis'].isna().all:
+            df_mean = df.groupby(['target', 'axis', 'pc_index', 'pc_id', 'participant_id', 'PRMD_ever'])['pc_score'].mean().reset_index()
+        else:
+            df_mean = df.groupby(['target', 'pc_index', 'pc_id', 'participant_id', 'PRMD_ever'])['pc_score'].mean().reset_index()    
         target_axes = df[['target', 'axis', 'pc_index', 'pc_id']].drop_duplicates().values.tolist()
+        meas_time_point = df['meas_time_point'][0]     
+        
         pc_distribution_results = []
         for target, axis, pc_index, pc_id in target_axes:
             stat_pain, p_pain, stat_nopain, p_nopain = self.shapiro_wilk_test(df_mean, target, axis, pc_id)
@@ -88,8 +92,12 @@ class AssumptionsTester:
                 stat_nopain (float): Test statistic for no-pain group.
                 p_nopain (float): p-value for no-pain group.
         """
-        pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_id'] == pc_id)]['pc_score']
-        nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_id'] == pc_id)]['pc_score']
+        if 'axis' in df.columns:
+            pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_id'] == pc_id)]['pc_score']
+            nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_id'] == pc_id)]['pc_score']
+        else:
+            pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['pc_id'] == pc_id)]['pc_score']
+            nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['pc_id'] == pc_id)]['pc_score']            
         stat_pain, p_pain = st.shapiro(pain_group)
         stat_nopain, p_nopain = st.shapiro(nopain_group)
         return stat_pain, p_pain, stat_nopain, p_nopain

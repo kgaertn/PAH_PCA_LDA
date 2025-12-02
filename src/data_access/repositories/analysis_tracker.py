@@ -51,8 +51,24 @@ class AnalysisTracker(BaseRepository):
         device = exp_params['device']
         pain_groups = exp_params['pain_groups']
         analysis_name = exp_params['analysis_name']
+
+        #if 'pca' not in analysis_name:
+        if type(measurement_tp) == list and len(measurement_tp) > 1:
+            measurement_tp = json.dumps(measurement_tp)
+            analysis_params['measurement_tp'] = measurement_tp
+        elif type(measurement_tp) == list and len(measurement_tp) == 1:
+            measurement_tp = measurement_tp[0]
+            analysis_params['measurement_tp'] = measurement_tp
+            
+        if type(device) == list and len(device) > 1:
+            device = json.dumps(device)
+            analysis_params['device'] = device
+        elif type(device) == list and len(device) == 1:
+            device = device[0]
+            analysis_params['device'] = device
+            
         signature, _ = self.make_param_signature(analysis_name, analysis_params)
-        pain_groups_json = json.dumps(pain_groups)
+        pain_groups_json = json.dumps(pain_groups)   
         
         filters = {
                 "exp_id": exp_id,
@@ -63,6 +79,12 @@ class AnalysisTracker(BaseRepository):
                 "param_signature":signature
             }
             
+        #rows = self.get_advanced(
+        #    table_or_view="analysis_log",
+        #    distinct = False,
+        #    return_df=False, 
+        #    **filters
+        #)
         rows = self.get(table_or_view="analysis_log", **filters)
         rows = pd.DataFrame(rows)
         if not rows.empty:
@@ -76,9 +98,25 @@ class AnalysisTracker(BaseRepository):
         device = exp_params['device']
         pain_groups = exp_params['pain_groups']
         analysis_name = exp_params['analysis_name']
+        #device_groups_json = json.dumps(device)
+        #param_json = json.dumps(relevant_params)
+        if type(measurement_tp) == list and len(measurement_tp) > 1:
+            measurement_tp = json.dumps(measurement_tp)
+            analysis_params['measurement_tp'] = measurement_tp
+        elif type(measurement_tp) == list and len(measurement_tp) == 1:
+            measurement_tp = measurement_tp[0]
+            analysis_params['measurement_tp'] = measurement_tp
+            
+        if type(device) == list and len(device) > 1:
+            device = json.dumps(device)
+            analysis_params['device'] = device
+        elif type(device) == list and len(device) == 1:
+            device = device[0]
+            analysis_params['device'] = device
+        
         signature, relevant_params = self.make_param_signature(analysis_name, analysis_params)
         pain_groups_json = json.dumps(pain_groups)
-        #param_json = json.dumps(relevant_params)
+        
         try:
             data = {
                 "exp_id": exp_id,

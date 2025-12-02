@@ -217,11 +217,13 @@ class DataLoader:
         Returns:
             list: List of target-axis pairs.
         """
+        columns = ['target'] if device == 'emg' else ['target', 'axis'] 
+        exclude= None if device == 'emg' else {'rotation_sequence': ['carrying_angle','redundant']}
         target_axes = self.meas_repo.get_advanced(
             table_or_view = 'measurement_type',
             columns=['target', 'axis'], 
-            exclude={'rotation_sequence': ['carrying_angle','redundant']},
-            order_by=['target', 'axis'],
+            exclude=exclude,
+            order_by=columns,
             experiment_id = experiment,
             device = device,
             meas_time_point = meas_time_point,
@@ -244,8 +246,12 @@ class DataLoader:
         Returns:
             pd.DataFrame: Filtered data.
     """
-        df = self.dp_repo.get(table_or_view="[Complete Data]", experiment_id = exp_id, device = device, timepoint = timepoint, 
-                              target = target, axis = axis, participant_id = participant_ids)
+        if axis != None:
+            df = self.dp_repo.get(table_or_view="[Complete Data]", experiment_id = exp_id, device = device, timepoint = timepoint, 
+                                target = target, axis = axis, participant_id = participant_ids)
+        else:
+            df = self.dp_repo.get(table_or_view="[Complete Data]", experiment_id = exp_id, device = device, timepoint = timepoint, 
+                                target = target, participant_id = participant_ids)
         return df   
          
     def load_clean_data_by_exp_device_tp_target_axis_participants(self,exp_id:int, device:str, timepoint:str, target:str,  

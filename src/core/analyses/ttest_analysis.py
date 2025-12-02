@@ -124,13 +124,16 @@ class TTestAnalyser(AbstractAnalyser):
         Returns:
             pd.DataFrame: t-test results sorted by absolute t-value.
         """
-
+        
         unique_target_axes = df[['target', 'axis']].drop_duplicates().values.tolist()
         df_pc_reduced = df[['participant_id', 'PRMD_ever', 'target', 'axis', 'pc_id', 'pc_index', 'pc_score']]
     
         t_test_total = []
         for target, axis in unique_target_axes:
-            df_target_axis = df_pc_reduced[(df_pc_reduced["target"] == target) & (df_pc_reduced["axis"] == axis)]
+            if axis != None:
+                df_target_axis = df_pc_reduced[(df_pc_reduced["target"] == target) & (df_pc_reduced["axis"] == axis)]
+            else:
+                df_target_axis = df_pc_reduced[(df_pc_reduced["target"] == target)]
             t_test_target_axis = self.calculate_t_test(df_target_axis)
             t_test_total.extend(t_test_target_axis)
         
