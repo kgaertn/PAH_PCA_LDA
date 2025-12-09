@@ -42,7 +42,8 @@ class DatapointRepository(BaseRepository):
             "up_down": dp.up_down,
             "key": dp.key,
             "time_point": dp.time_point,
-            "value": dp.value
+            "value": dp.value,
+            "sample_id":dp.sample_id
         } for dp in datapoints]
         self.insert_many("datapoint", data_list)
 

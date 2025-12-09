@@ -6,6 +6,7 @@ from processing.assumptions_testing import AssumptionsTester
 
 from pathlib import Path
 import matplotlib.pyplot as plt
+import numpy as np
 
 class GeneralAnalyser(AbstractAnalyser):
     def __init__(self, cfg, logger):
@@ -30,7 +31,7 @@ class GeneralAnalyser(AbstractAnalyser):
             self.create_plots_mean_std_keys(device, exp_id, measurement_tp, pain_groups)
             self.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups)
             self.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups, key_diff_controlled=True)
-            self.create_plots_key_per_participant(device, exp_id, measurement_tp, pain_groups)
+            #self.create_plots_key_per_participant(device, exp_id, measurement_tp, pain_groups)
         return None
     
 
@@ -57,17 +58,30 @@ class GeneralAnalyser(AbstractAnalyser):
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df_pain = self.data_loader.clean_data_by_exp_device_tp_target_axis(exp_id, device, measurement_tp, target, axis, participant_ids)
             pain_group_names = self.concat_pain_groups(pain_groups)
-            filename = f"{pain_group_names}_{measurement_tp}_Original_Mean_Std_{target}_{axis}"
+            
+            if type(measurement_tp) == list and len(measurement_tp) > 1:
+                tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+            else:
+                tp = measurement_tp[0]
+                
+            if type(device) == list and len(device) > 1:
+                dev =  [", ".join(device), ", ".join(reversed(device))]
+            else:
+                dev = device[0]     
+                
+            filename = f"{tp}_{pain_group_names}_Original_Mean_Std_{target}_{axis}"
             if key_diff_controlled:
                 df_pain = self.data_processor.subtract_meanwave_key_difference(df_pain)
                 filename = "Key_controled_" + filename
                 if df_pain['key_difference'].abs().mean() > 5:
-                    print("")
+                    print("Key difference abs mean > 5")
+                    
             value_cols = ['value_centered'] if key_diff_controlled else ['value']
             title = f"{pain_group_names}, {target}, {axis}: Mean and Std Dev over Time"
             fig = self.data_plotter.plot_mean_std_by_group(df_pain, time_col='dp_time_point', value_cols=value_cols, group_col='PRMD_ever', title=title)
             current_path = Path.cwd()
-            output_path = current_path / "output" / "plots" / "Mean_Std" / "mean_std_per_group" / f"{pain_group_names}"
+              
+            output_path = current_path / "output" / "plots" / f"{dev}" / "Mean_Std" / "mean_std_per_group" / f"{pain_group_names}"
             output_path.mkdir(parents=True, exist_ok=True)
             self.data_plotter.save_plot(fig, output_path, filename)
                 
@@ -127,9 +141,19 @@ class GeneralAnalyser(AbstractAnalyser):
             fig.suptitle(f"{pain_group_names}, {target}, {axis}: Mean ± StdDev by Key pair and PRMD", fontsize=16)
             fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
-            output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "bow_stroke_pairs" / f"{pain_group_names}"
+            if type(measurement_tp) == list and len(measurement_tp) > 1:
+                tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+            else:
+                tp = measurement_tp[0]
+                
+            if type(device) == list and len(device) > 1:
+                dev =  [", ".join(device), ", ".join(reversed(device))]
+            else:
+                dev = device[0]
+                
+            output_path = Path.cwd() / "output" / "plots" /f"{dev}" / "Mean_Std" / "bow_stroke_pairs" / f"{pain_group_names}"
             output_path.mkdir(parents=True, exist_ok=True)
-            self.data_plotter.save_plot(fig, output_path, f"{pain_group_names}_{measurement_tp}_Key_Pairs_Subplots_{target}_{axis}")
+            self.data_plotter.save_plot(fig, output_path, f"{pain_group_names}_{tp}_Key_Pairs_Subplots_{target}_{axis}")
     
     @staticmethod        
     def concat_pain_groups(pain_groups:list[str]) -> str:
@@ -192,18 +216,28 @@ class GeneralAnalyser(AbstractAnalyser):
                     ax.set_xlabel("Time point")
                     ax.set_ylabel("Value")
             
-            y_min = min(all_y_values)
-            y_max = max(all_y_values)
+            y_min = np.nanmin(all_y_values)
+            y_max = np.nanmax(all_y_values)
             offset = abs((y_max-y_min))/5
             for ax in axes:
                 ax.set_ylim(y_min-offset, y_max+offset)
             
             fig.suptitle(f"{pain_group_names}, {target}, {axis}: Mean over Time by key pairs per group", fontsize=16)
             fig.tight_layout()
-
-            output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "keys_per_group" / f"{pain_group_names}"
+            
+            if type(measurement_tp) == list and len(measurement_tp) > 1:
+                tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+            else:
+                tp = measurement_tp[0]
+                
+            if type(device) == list and len(device) > 1:
+                dev =  [", ".join(device), ", ".join(reversed(device))]
+            else:
+                dev = device[0]
+            
+            output_path = Path.cwd() / "output" / "plots" /f"{dev}" /  "Mean_Std" / "keys_per_group" / f"{pain_group_names}"
             output_path.mkdir(parents=True, exist_ok=True)
-            self.data_plotter.save_plot(fig, output_path, f"{measurement_tp}_Combined_Mean_{target}_{axis}")
+            self.data_plotter.save_plot(fig, output_path, f"{tp}_Combined_Mean_{target}_{axis}")
     
     def create_plots_key_per_participant(self, device:str, exp_id:int, measurement_tp:str, pain_groups:list[str]):
         """
@@ -256,8 +290,8 @@ class GeneralAnalyser(AbstractAnalyser):
                         ax.set_xlabel("Time point")
                         ax.set_ylabel("Value")
 
-                y_min = min(all_y_values)
-                y_max = max(all_y_values)
+                y_min = np.nanmin(all_y_values)
+                y_max = np.nanmax(all_y_values)
                 offset = abs((y_max-y_min))/5
                 for ax in axes:
                     ax.set_ylim(y_min-offset, y_max+offset)
@@ -266,7 +300,17 @@ class GeneralAnalyser(AbstractAnalyser):
                 fig.tight_layout()
                 
                 target_str = target.replace(" ", "_")
-
-                output_path = Path.cwd() / "output" / "plots" / "Mean_Std" / "keys_per_participant" / f"{pain_group_names}"/ f"{target_str}_{axis}" 
+                
+                if type(measurement_tp) == list and len(measurement_tp) > 1:
+                    tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+                else:
+                    tp = measurement_tp[0]
+                    
+                if type(device) == list and len(device) > 1:
+                    dev =  [", ".join(device), ", ".join(reversed(device))]
+                else:
+                    dev = device[0]
+                
+                output_path = Path.cwd() / "output" / "plots" /f"{dev}" / "Mean_Std" / "keys_per_participant" / f"{pain_group_names}"/ f"{target_str}_{axis}" 
                 output_path.mkdir(parents=True, exist_ok=True)
-                self.data_plotter.save_plot(fig, output_path, f"Part_{ext_part_id}_{measurement_tp}_Key_Mean_{target}_{axis}")
+                self.data_plotter.save_plot(fig, output_path, f"{tp}_Part_{ext_part_id}_Key_Mean_{target}_{axis}")

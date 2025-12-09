@@ -18,6 +18,7 @@ from sklearn.experimental import enable_iterative_imputer
 from sklearn.impute import SimpleImputer, KNNImputer, IterativeImputer
 from sklearn.pipeline import make_pipeline
 from itertools import combinations
+import json
 
 class LDAAnalyser(AbstractAnalyser):
     def __init__(self, cfg, logger, run_rotated = False):
@@ -36,6 +37,8 @@ class LDAAnalyser(AbstractAnalyser):
     def run(self, key):
         """"""
         # This should be part of the config
+        devices = key['device']
+        meas_timepoint = key['measurement_tp']
         scaler_type = key['lda_scaler_type']
         imputer_type = key['lda_imputation_type']
         imputer_parameter = key['lda_imputer_parameter']
@@ -45,9 +48,20 @@ class LDAAnalyser(AbstractAnalyser):
         n_folds = key['lda_splits']
         n_repeats = key['lda_repeats']
         
+        if type(meas_timepoint) == list and len(meas_timepoint) > 1:
+            meas_timepoint = ", ".join(meas_timepoint)
+        elif type(meas_timepoint) == list and len(meas_timepoint) == 1:
+            meas_timepoint = meas_timepoint[0]
+            
+        if type(devices) == list and len(devices) > 1:
+            devices = ", ".join(devices)
+        elif type(devices) == list and len(devices) == 1:
+            devices = devices[0]
+        
         pipe = self.create_pipeline(scaler, imputer)
         
         # check if PCA on full dataset is upload for these settings
+        #TODO: check if this function works correctly
         full_lda_uploaded = self.data_loader.check_full_lda_uploaded(key, self.run_rotated)
         #gkf = StratifiedGroupKFold(n_splits=n_folds)
         
@@ -111,6 +125,8 @@ class LDAAnalyser(AbstractAnalyser):
 
             result = LDAResults(
                 id=0,
+                devices=devices,
+                measurement_tp=meas_timepoint,
                 pc_ids=pc_ids,
                 nr_components=k,
                 acc_values=acc_values_all.tolist(),  # keep raw values
@@ -173,6 +189,8 @@ class LDAAnalyser(AbstractAnalyser):
                     
                 result = LDAResults(
                     id=0,
+                    devices=devices,
+                    measurement_tp=meas_timepoint,
                     pc_ids=pc_ids,
                     nr_components=k,
                     acc_values=None,  # keep raw values
@@ -268,6 +286,16 @@ class LDAAnalyser(AbstractAnalyser):
         t_test_assumptions_relevant = key['t_test_assumptions_relevant']
         t_test_distribution_type = key['t_test_distribution_type']
         
+        #if type(measurement_tp) == list and len(measurement_tp) > 1:
+        #    measurement_tp = json.dumps(measurement_tp)
+        #elif type(measurement_tp) == list and len(measurement_tp) == 1:
+        #    measurement_tp = measurement_tp[0]
+            
+        #if type(device) == list and len(device) > 1:
+        #    device = json.dumps(device)
+        #elif type(device) == list and len(device) == 1:
+        #    device = device[0]
+        
         ranked_pc_scores_df = self.data_loader.load_pcs_by_rank(exp_id, device,measurement_tp,pain_groups, 
                                                                 nr_components= nr_components,select_rotated= self.run_rotated, 
                                                                 use_distribution= t_test_assumptions_relevant, distribution_type = t_test_distribution_type)
@@ -339,6 +367,16 @@ class LDAAnalyser(AbstractAnalyser):
         lda_scaler_type = key['lda_scaler_type']
         lda_validation_type = key['lda_validation_type']
         
+        if type(measurement_tp) == list and len(measurement_tp) > 1:
+            measurement_tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+        elif type(measurement_tp) == list and len(measurement_tp) == 1:
+            measurement_tp = measurement_tp[0]
+            
+        if type(device) == list and len(device) > 1:
+            device = [", ".join(device), ", ".join(reversed(device))]
+        elif type(device) == list and len(device) == 1:
+            device = device[0]
+        
         lda_results_cv = self.data_loader.load_lda(exp_id, device, measurement_tp, pain_groups, pca_scaled, self.run_rotated, 
                                                 rotation_type, imputation_type, lda_scaler_type, lda_validation_type)  
         lda_results_full = self.data_loader.load_lda(exp_id, device, measurement_tp, pain_groups, pca_scaled, self.run_rotated, 
@@ -355,13 +393,15 @@ class LDAAnalyser(AbstractAnalyser):
         lda_validation_label = df_lda['lda_validation_type'].unique()[0]
         lda_imputation_label = df_lda['lda_imputation_type'].unique()[0]
         measurement_tp = df_lda['meas_time_point'].unique()[0]
+        devices = df_lda['device'].unique()
+        device = ", ".join(devices)
         
         df_class_seperation = df_lda[df_lda['lda_nr_components'] == k]
         lda_means = df_class_seperation['lda_class_means']
         fig = self.data_plotter.plot_lda_class_distribution_from_row(df_class_seperation)
         
         current_path = Path.cwd()
-        output_path = current_path / "output" / "plots" / "LDA_Class_Seperation" / f"{pain_group_names}" / f"{rotation_label}" / f"{lda_validation_label}" / f"{lda_imputation_label}"
+        output_path = current_path / "output" / "plots" /f"{device}" / "LDA_Class_Seperation" / f"{pain_group_names}" / f"{rotation_label}" / f"{lda_validation_label}" / f"{lda_imputation_label}"
         output_path.mkdir(parents=True, exist_ok=True)
         
         fig_name = f"{measurement_tp}_LDA_Class_Seperation"
@@ -374,7 +414,8 @@ class LDAAnalyser(AbstractAnalyser):
         lda_validation_label = lda_results_cv['lda_validation_type'].unique()[0]
         lda_imputation_label = lda_results_cv['lda_imputation_type'].unique()[0]
         measurement_tp = lda_results_cv['meas_time_point'].unique()[0]
-        
+        devices = lda_results_cv['device'].unique()
+        device = ", ".join(devices)
         
         # coefs: array of shape (n_folds, n_features)
         for k in range(2, max(lda_results_cv['lda_nr_components'])+1):
@@ -382,7 +423,7 @@ class LDAAnalyser(AbstractAnalyser):
             fig = self.data_plotter.plot_feature_importance(lda_results_component)
         
             current_path = Path.cwd()
-            output_path = current_path / "output" / "plots" / "LDA_Feature_importance" / f"{pain_group_names}" / f"{rotation_label}" / f"{lda_validation_label}" / f"{lda_imputation_label}"
+            output_path = current_path / "output" / "plots" / f"{device}" / "LDA_Feature_importance" / f"{pain_group_names}" / f"{rotation_label}" / f"{lda_validation_label}" / f"{lda_imputation_label}"
             output_path.mkdir(parents=True, exist_ok=True)
             
             fig_name = f"{measurement_tp}_Components{k}_Feature_importance"
@@ -398,9 +439,11 @@ class LDAAnalyser(AbstractAnalyser):
         lda_validation_label = lda_results_cv['lda_validation_type'].unique()[0]
         lda_imputation_label = lda_results_cv['lda_imputation_type'].unique()[0]
         measurement_tp = lda_results_cv['meas_time_point'].unique()[0]
+        devices = lda_results_cv['device'].unique()
+        device = ", ".join(devices)
         
         current_path = Path.cwd()
-        output_path = current_path / "output" / "plots" / "LDA_results" / f"{pain_group_names}" / f"{rotation_label}" / f"{lda_validation_label}" / f"{lda_imputation_label}"
+        output_path = current_path / "output" / "plots" / f"{device}" / "LDA_results" / f"{pain_group_names}" / f"{rotation_label}" / f"{lda_validation_label}" / f"{lda_imputation_label}"
         output_path.mkdir(parents=True, exist_ok=True)
         
         fig_name = f"{measurement_tp}_LDA_Results_Missclassification_Error"

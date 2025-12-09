@@ -232,8 +232,7 @@ class DataPlotter:
 
     def plot_top_3_PCAs(self, orig_data:pd.DataFrame, component_data:dict, title_waveform:str="Mean Waveform", 
                             title_loading:str="Loading Vector", lv_ymax: float|None = None, lv_ymin: float|None = None) -> matplotlib.figure.Figure:
-   
-        
+            
         fig, axes = plt.subplots(3, 3, figsize=(18, 15), constrained_layout=True)
         all_values = []
         all_loading_vectors = []
@@ -242,7 +241,10 @@ class DataPlotter:
             target_clean = target.removesuffix("joint angle").strip()
             axis = component_data[rank]['axis']
             pc_index = component_data[rank]['pc_index']
-            rotation_sequence = component_data[rank]['rotation_sequence'].replace("_", " ")
+            if component_data[rank]['rotation_sequence'] != None:
+                rotation_sequence = component_data[rank]['rotation_sequence'].replace("_", " ")
+            else:
+                rotation_sequence = ""
             mean_waveform_pain = component_data[rank]['component_data']['mean_waveform_pain']
             mean_waveform_no_pain = component_data[rank]['component_data']['mean_waveform_no_pain']
             lower_band = component_data[rank]['component_data']['lower_band']
@@ -261,7 +263,10 @@ class DataPlotter:
                 ("Upper Band", upper_band),
             ]  
 
-            df_target_axis = orig_data[(orig_data['target'] == target) & (orig_data['axis'] == axis)]
+            if axis != None:
+                df_target_axis = orig_data[(orig_data['target'] == target) & (orig_data['axis'] == axis)]
+            else:
+                df_target_axis = orig_data[(orig_data['target'] == target)]
             time_cols = sorted(
                 [col for col in df_target_axis.columns if col.startswith("t") and col[1:].isdigit()],
                 key=lambda c: int(c[1:])
@@ -347,7 +352,10 @@ class DataPlotter:
             target_clean = target.removesuffix("joint angle").strip()
             axis = component_data[rank]['axis']
             pc_index = component_data[rank]['pc_index']
-            rotation_sequence = component_data[rank]['rotation_sequence'].replace("_", " ")
+            if component_data[rank]['rotation_sequence'] != None:
+                rotation_sequence = component_data[rank]['rotation_sequence'].replace("_", " ")
+            else:
+                rotation_sequence = ""
             mean_waveform_pain = component_data[rank]['component_data']['mean_waveform_pain']
             mean_waveform_no_pain = component_data[rank]['component_data']['mean_waveform_no_pain']
             lower_band = component_data[rank]['component_data']['lower_band']
@@ -366,7 +374,10 @@ class DataPlotter:
                 ("Upper Band", upper_band),
             ]  
 
-            df_target_axis = orig_data[(orig_data['target'] == target) & (orig_data['axis'] == axis)]
+            if axis != None:
+                df_target_axis = orig_data[(orig_data['target'] == target) & (orig_data['axis'] == axis)]
+            else:
+                df_target_axis = orig_data[(orig_data['target'] == target)]
             time_cols = sorted(
                 [col for col in df_target_axis.columns if col.startswith("t") and col[1:].isdigit()],
                 key=lambda c: int(c[1:])
@@ -595,7 +606,7 @@ class DataPlotter:
             file_format (str, optional): File format (e.g., 'png', 'pdf'). Defaults to 'png'.
         """
         full_filename = f"{filename}.{file_format}"
-        fig.savefig(str(file_path) +'\\' + full_filename, dpi=dpi, format=file_format, bbox_inches='tight')
+        fig.savefig(file_path/full_filename, dpi=dpi, format=file_format, bbox_inches='tight')
         plt.close()
         print(f"Plot saved to {full_filename}")
     

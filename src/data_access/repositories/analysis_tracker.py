@@ -3,6 +3,7 @@ from data_access.repositories.base_repository import BaseRepository
 
 import sqlite3, json, hashlib
 import pandas as pd
+import copy
 
 class AnalysisTracker(BaseRepository):
     def __init__(self):
@@ -48,35 +49,55 @@ class AnalysisTracker(BaseRepository):
         #relevant_analysis_params = self.filter_relevant_params(analysis_params)
         exp_id = exp_params['exp_id']
         measurement_tp = exp_params['measurement_tp']
-        device = exp_params['device']
+        devices = exp_params['device']
         pain_groups = exp_params['pain_groups']
         analysis_name = exp_params['analysis_name']
 
         #if 'pca' not in analysis_name:
+                
         if type(measurement_tp) == list and len(measurement_tp) > 1:
-            measurement_tp = json.dumps(measurement_tp)
-            analysis_params['measurement_tp'] = measurement_tp
-        elif type(measurement_tp) == list and len(measurement_tp) == 1:
-            measurement_tp = measurement_tp[0]
-            analysis_params['measurement_tp'] = measurement_tp
+            measurement_tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+        elif type(measurement_tp) == str:
+            measurement_tp = [measurement_tp]
             
-        if type(device) == list and len(device) > 1:
-            device = json.dumps(device)
-            analysis_params['device'] = device
-        elif type(device) == list and len(device) == 1:
-            device = device[0]
-            analysis_params['device'] = device
-            
-        signature, _ = self.make_param_signature(analysis_name, analysis_params)
+        if type(devices) == list and len(devices) > 1:
+            devices = [", ".join(devices), ", ".join(reversed(devices))]
+        elif type(devices) == str:
+            devices = [devices]
+        
+        #if type(measurement_tp) == list and len(measurement_tp) > 1:
+        #    measurement_tp = json.dumps(measurement_tp)
+        #    analysis_params['measurement_tp'] = measurement_tp
+        #elif type(measurement_tp) == list and len(measurement_tp) == 1:
+        #    measurement_tp = measurement_tp[0]
+        #    analysis_params['measurement_tp'] = measurement_tp
+        #    
+        #if type(device) == list and len(device) > 1:
+        #    device = json.dumps(device)
+        #    analysis_params['device'] = device
+        #elif type(device) == list and len(device) == 1:
+        #    device = device[0]
+        #    analysis_params['device'] = device
+        
+        #TODO: this is unnecessary, the signature only looks for specific parameters of the analyses, not the measurement_tp or device
+        all_signatures = []
+        for tp in measurement_tp:
+            for device in devices:
+                analysis_params['measurement_tp'] = tp
+                analysis_params['device'] = device
+                signature,_ = self.make_param_signature(analysis_name, analysis_params)
+                all_signatures.append(signature)
+        
+        #signature, _ = self.make_param_signature(analysis_name, analysis_params)
         pain_groups_json = json.dumps(pain_groups)   
         
         filters = {
                 "exp_id": exp_id,
-                "device": device,
+                "device": devices,
                 "measurement_tp": measurement_tp,
                 "pain_groups": pain_groups_json,
                 "analysis_name": analysis_name,
-                "param_signature":signature
+                "param_signature":all_signatures
             }
             
         #rows = self.get_advanced(
@@ -100,19 +121,35 @@ class AnalysisTracker(BaseRepository):
         analysis_name = exp_params['analysis_name']
         #device_groups_json = json.dumps(device)
         #param_json = json.dumps(relevant_params)
+        
         if type(measurement_tp) == list and len(measurement_tp) > 1:
-            measurement_tp = json.dumps(measurement_tp)
+            measurement_tp = ", ".join(measurement_tp)
             analysis_params['measurement_tp'] = measurement_tp
         elif type(measurement_tp) == list and len(measurement_tp) == 1:
             measurement_tp = measurement_tp[0]
             analysis_params['measurement_tp'] = measurement_tp
             
         if type(device) == list and len(device) > 1:
-            device = json.dumps(device)
+            device = ", ".join(device)
             analysis_params['device'] = device
         elif type(device) == list and len(device) == 1:
             device = device[0]
             analysis_params['device'] = device
+            
+        
+        #if type(measurement_tp) == list and len(measurement_tp) > 1:
+        #    measurement_tp = json.dumps(measurement_tp)
+        #    analysis_params['measurement_tp'] = measurement_tp
+        #elif type(measurement_tp) == list and len(measurement_tp) == 1:
+        #    measurement_tp = measurement_tp[0]
+        #    analysis_params['measurement_tp'] = measurement_tp
+            
+        #if type(device) == list and len(device) > 1:
+        #    device = json.dumps(device)
+        #    analysis_params['device'] = device
+        #elif type(device) == list and len(device) == 1:
+        #    device = device[0]
+        #    analysis_params['device'] = device
         
         signature, relevant_params = self.make_param_signature(analysis_name, analysis_params)
         pain_groups_json = json.dumps(pain_groups)

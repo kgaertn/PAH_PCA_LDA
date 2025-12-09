@@ -17,6 +17,7 @@ from data_access.models.pain_group import PainGroup
 
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
+import json
 
 class DataLoader:
     
@@ -498,6 +499,17 @@ class DataLoader:
         validation_type = 'no_validation'
         n_folds = key['lda_splits']
         n_repeats = key['lda_repeats']
+        
+        if type(meas_timepoint) == list and len(meas_timepoint) > 1:
+            meas_timepoint = [", ".join(meas_timepoint), ", ".join(reversed(meas_timepoint))]
+        elif type(meas_timepoint) == list and len(meas_timepoint) == 1:
+            meas_timepoint = meas_timepoint[0]
+            
+        if type(device) == list and len(device) > 1:
+            device = [", ".join(device), ", ".join(reversed(device))]
+        elif type(device) == list and len(device) == 1:
+            device = device[0]
+        
         
         uploaded_ldas = self.lda_repo.get_lda_results(exp_id = exp_id, device = device, measurement_tp = meas_timepoint, pain_group_names = pain_group_names, pca_scaled= pca_scaled, 
                                                       rotation_type = rotation_type, lda_imputation_type = imputer_type, lda_scaler_type = scaler_type, lda_validation_type = validation_type)

@@ -172,6 +172,9 @@ class DataProcessor:
         Returns:
             pd.DataFrame: Wide-format DataFrame.
         """
+        if df['axis'].isna().all():
+            index_cols = ["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 
+                                                'target', "sample_id"]
 
         wide_df = df.pivot_table(
             index=index_cols,
@@ -200,8 +203,10 @@ class DataProcessor:
         """
         df_outliers_adj = df.copy()
         count_outliers = 0
+        
+        split_idx = df_outliers_adj.columns.get_loc("sample_id") + 1
+        time_cols = df.columns[split_idx:]
 
-        time_cols = df.columns[-202:]
         static_cols = df.columns.difference(time_cols)
 
         for participant, df_part in df.groupby("participant_id"):

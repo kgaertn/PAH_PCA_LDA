@@ -33,9 +33,10 @@ class StatisticalAnalyser(AbstractAnalyser):
         """"""
         pain_groups = exp_params['pain_groups']
         pain_group_names = self.data_plotter.concat_pain_groups(pain_groups)
+        device = analysis_params['device']
         current_path = Path.cwd()
         
-        output_path = current_path / "output" / "csvs" / "Pre_post_comparison" / f"{pain_group_names}"
+        output_path = current_path / "output" / "csvs" / f"{device}" /   "Pre_post_comparison" / f"{pain_group_names}"
         output_path.mkdir(parents=True, exist_ok=True)
         filename = "Pre_post_comparison.csv"
         results.to_csv(output_path / filename, index=False, encoding="utf-8", sep = ";", decimal=",")

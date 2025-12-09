@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Optional
 
 @dataclass
 class Datapoint:
@@ -10,3 +11,4 @@ class Datapoint:
     key:str
     time_point: int
     value: float
+    sample_id: Optional[int] = None

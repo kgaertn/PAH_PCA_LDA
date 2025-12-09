@@ -114,7 +114,7 @@ class AnalysisRunner:
 
         for analysis in self.analyses:                    
             if analysis.analysis_name == 'pca' or analysis.analysis_name == 'pca_rotated' or analysis.analysis_name == 'lda' or analysis.analysis_name == 'lda_rotated':
-                analysis.reconstruct_results(key)
+                analysis.reconstruct_results(key) # TODO: adjust to multiple devices
 
         #self.logger.info("All analyses completed.")
 

@@ -163,7 +163,10 @@ class PCAAnalyser(AbstractAnalyser):
                 df_sorted, _  = self.load_data_for_pca(key, target, axis, participant_ids)
                 df_transformed = self.process_data_for_pca(df_sorted)
                 df_outliers_removed, _ = self.check_and_remove_outliers(df_transformed)
-                df_part, df_pca = df_outliers_removed.iloc[:, :-202], df_outliers_removed.iloc[:, -202:]
+                
+                split_idx = df_transformed.columns.get_loc("sample_id") + 1
+                df_part, df_pca = df_outliers_removed.iloc[:, :split_idx], df_outliers_removed.iloc[:, split_idx:]
+                #df_part, df_pca = df_outliers_removed.iloc[:, :-202], df_outliers_removed.iloc[:, -202:]
             
                 rotated_scores = self.rotate_pc_scores(df_pca, scaler, rotated_loadings)
                 pca_info = {}
@@ -208,7 +211,8 @@ class PCAAnalyser(AbstractAnalyser):
         df_transformed = self.process_data_for_pca(df_sorted)
         df_outliers_removed, count_outliers = self.check_and_remove_outliers(df_transformed)
         print(f"{target} {axis} Outliers (after key norm): {count_outliers}\t")
-        df_part, df_pca = df_outliers_removed.iloc[:, :-202], df_outliers_removed.iloc[:, -202:]
+        split_idx = df_sorted_transformed.columns.get_loc("sample_id") + 1
+        df_part, df_pca = df_outliers_removed.iloc[:, :split_idx], df_outliers_removed.iloc[:, split_idx:]
         measurement_type_id = int(df_transformed['measurement_type_id'].unique()[0])
         prepared_data = {
             "target": target,
@@ -252,12 +256,12 @@ class PCAAnalyser(AbstractAnalyser):
             'value'
         ]]
         df_sorted = df_reduced.sort_values(by=['participant_id', 'bow_stroke', 'up_down', 'dp_time_point'])  
-        if axis != None:
-            df_sorted_transformed = self.data_processor.pivot_full_cycles_to_wide(df_sorted, 'value','dp_time_point')
-        else:
-            df_sorted_transformed = self.data_processor.pivot_full_cycles_to_wide(df_sorted, 'value','dp_time_point', 
-                                                                                  index_cols = ["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 
-                                                                                    'target', "sample_id"])
+        #if axis != None:
+        df_sorted_transformed = self.data_processor.pivot_full_cycles_to_wide(df_sorted, 'value','dp_time_point')
+        #else:
+        #    df_sorted_transformed = self.data_processor.pivot_full_cycles_to_wide(df_sorted, 'value','dp_time_point', 
+        #                                                                         index_cols = ["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 
+        #                                                                           'target', "sample_id"])
           
         return df_sorted, df_sorted_transformed
         
@@ -265,6 +269,7 @@ class PCAAnalyser(AbstractAnalyser):
         # TODO create function for this part
         df_sorted_transformed = prepared_data["df_sorted_transformed"]
         df_transformed = prepared_data["df_transformed"]
+        device = df_sorted_transformed['device']
         pain_group_names = self.data_plotter.concat_pain_groups(pain_groups)
         
         self.plot_data_linearity(target, axis, df_sorted_transformed, pain_groups)
@@ -272,7 +277,7 @@ class PCAAnalyser(AbstractAnalyser):
         fig_corr_mat = self.assumptions_tester.plot_pca_requirements(corr_mat, target, axis)
         current_path = Path.cwd()
         
-        output_path = current_path / "output" / "plots" / "Correlation_matrix" / f"{pain_group_names}"
+        output_path = current_path / "output" / "plots" /f"{device}" / "Correlation_matrix" / f"{pain_group_names}"
         output_path.mkdir(parents=True, exist_ok=True)
         self.data_plotter.save_plot(fig_corr_mat, output_path, f"Original_Data_Correlation_matrix_{target}_{axis}")
         
@@ -365,12 +370,12 @@ class PCAAnalyser(AbstractAnalyser):
         """
         # TODO: save mean key per target/axis? / plot mean key? 
         df_key_normalized = self.data_processor.subtract_meanwave_key_difference(df_sorted)
-        if df_key_normalized['axis'].isna().all():
-            df_transformed = self.data_processor.pivot_full_cycles_to_wide(df=df_key_normalized, value='value_centered',pivot_column='dp_time_point',
-                                                                           index_cols = ["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 
-                                                'target', "sample_id"])
-        else:
-            df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_key_normalized, 'value_centered','dp_time_point')
+        #if df_key_normalized['axis'].isna().all():
+        #    df_transformed = self.data_processor.pivot_full_cycles_to_wide(df=df_key_normalized, value='value_centered',pivot_column='dp_time_point',
+        #                                                                   index_cols = ["participant_id", "measurement_id","measurement_type_id", "PRMD_ever", 
+        #                                        'target', "sample_id"])
+        #else:
+        df_transformed = self.data_processor.pivot_full_cycles_to_wide(df_key_normalized, 'value_centered','dp_time_point')
         return df_transformed
     
     def check_and_remove_outliers(self, df:pd.DataFrame) -> tuple[pd.DataFrame, int]:
@@ -398,12 +403,13 @@ class PCAAnalyser(AbstractAnalyser):
             axis (str): Axis name.
             df (pd.DataFrame): Dataframe with data to plot.
         """
+        device = df['device']
         pain_group_names = self.data_plotter.concat_pain_groups(pain_groups)
         fig_title = f"{target}, {axis}"
         fig1, fig2 = self.data_plotter.plot_linearity(df, fig_title)
         current_path = Path.cwd()
         #output_path = current_path / "output" / "plots"
-        output_path = current_path / "output" / "plots" / "Linearity_plots" / f"{pain_group_names}"
+        output_path = current_path / "output" / "plots" /f"{device}" /  "Linearity_plots" / f"{pain_group_names}"
         output_path.mkdir(parents=True, exist_ok=True)
         self.data_plotter.save_plot(fig1, output_path, f"Scatter_matrix_{target}_{axis}")
         self.data_plotter.save_plot(fig2, output_path, f"Lag_plot_{target}_{axis}")       
@@ -512,7 +518,7 @@ class PCAAnalyser(AbstractAnalyser):
         """
         # TODO: make this function cleaner (check dependencies etc.)
         exp_id = key['exp_id']
-        device = key['device']
+        devices = key['device']
         measurement_tp = key['measurement_tp']
         pain_groups = key['pain_groups']
         nr_components = key['nr_components']
@@ -520,8 +526,23 @@ class PCAAnalyser(AbstractAnalyser):
         rotation_type = key['rotation_method']
         t_test_assumptions_relevant = key['t_test_assumptions_relevant']
         t_test_distribution_type = key['t_test_distribution_type']
-               
-        ranked_pc_scores_df = self.data_loader.load_pcs_by_rank(exp_id, device,measurement_tp,pain_groups, 
+        
+        if type(measurement_tp) == list and len(measurement_tp) > 1:
+            tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+        elif type(measurement_tp) == list and len(measurement_tp) == 1:
+            tp = measurement_tp[0]
+        else:
+            tp = measurement_tp
+            
+        if type(devices) == list and len(devices) > 1:
+            device =  [", ".join(devices), ", ".join(reversed(devices))]
+        elif type(devices) == list and len(devices) == 1:
+            device = devices[0]
+        else:
+            device = devices
+        
+        #TODO: check how PCs are ranked here
+        ranked_pc_scores_df = self.data_loader.load_pcs_by_rank(exp_id, devices,measurement_tp,pain_groups, 
                                                                 nr_components= nr_components,select_rotated= select_rotated, 
                                                                 use_distribution= t_test_assumptions_relevant, distribution_type = t_test_distribution_type)
         pain_group_names = self.data_plotter.concat_pain_groups(pain_groups)
@@ -539,7 +560,7 @@ class PCAAnalyser(AbstractAnalyser):
             target, axis = current_pc_df['target'].unique()[0], current_pc_df['axis'].unique()[0]
             measurement_type_id = int(current_pc_df['meas_type_id'].unique()[0])
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
-            df = self.data_loader.clean_data_by_exp_device_tp_target_axis(exp_id, device, measurement_tp, target, axis, participant_ids)
+            df = self.data_loader.clean_data_by_exp_device_tp_target_axis(exp_id, devices, measurement_tp, target, axis, participant_ids)
             df_reduced = df[[
                     'participant_id', 'ext_participant_id', 'PRMD_ever',
                     'measurement_id','measurement_type_id', 'target', 'axis', 'sample_id', 'bow_stroke', 'up_down', 'key', 'dp_time_point',
@@ -571,25 +592,27 @@ class PCAAnalyser(AbstractAnalyser):
             
             distribution_label = f"{t_test_distribution_type}" if t_test_assumptions_relevant else "no_distribution_tested"
             rotation_label = f"{rotation_type}" if select_rotated else "unrotated"
+            #dev = device[0] if type(device) == list else device
+            #tp = measurement_tp[0] if type(measurement_tp) == list else measurement_tp
             
             current_path = Path.cwd()
-            output_path = current_path / "output" / "plots" / "PCA_Reconstruction" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
+            output_path = current_path / "output" / "plots" /f"{device}" / "PCA_Reconstruction" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
             output_path.mkdir(parents=True, exist_ok=True)
-            fig_name = f"{measurement_tp}{rotated_suffix_fname}_Rank_{rank}_{target}_{axis}_{pc_name}"
+            fig_name = f"{tp}{rotated_suffix_fname}_Rank_{rank}_{target}_{axis}_{pc_name}"
             self.data_plotter.save_plot(fig, output_path, fig_name)
         
         fig = self.data_plotter.plot_top_3_PCAs(orig_data_top_3_components, top_3_components)
         current_path = Path.cwd()
-        output_path = current_path / "output" / "plots" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
+        output_path = current_path / "output" / "plots" /f"{device}" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
         output_path.mkdir(parents=True, exist_ok=True)
-        fig_name = f"{measurement_tp}{rotated_suffix_fname}_TOP_3_PCs"
+        fig_name = f"{tp}_{rotated_suffix_fname}_TOP_3_PCs"
         self.data_plotter.save_plot(fig, output_path, fig_name)
         
         fig = self.data_plotter.plot_top_3_PCAs_reduced(orig_data_top_3_components, top_3_components)
         current_path = Path.cwd()
-        output_path = current_path / "output" / "plots" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
+        output_path = current_path / "output" / "plots" /f"{device}" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
         output_path.mkdir(parents=True, exist_ok=True)
-        fig_name = f"{measurement_tp}{rotated_suffix_fname}_TOP_3_PCs_reduced"
+        fig_name = f"{tp}_{rotated_suffix_fname}_TOP_3_PCs_reduced"
         self.data_plotter.save_plot(fig, output_path, fig_name)
             #plt.close()
             #fig = self.data_plotter.plot_PCA_reconstruction_per_group(component_reconstruction_data, title_reconstruction, title_loading_vector)
@@ -681,9 +704,11 @@ class PCAAnalyser(AbstractAnalyser):
         Returns:
             tuple: Mean waveforms for pain, no-pain, and overall groups.
         """    
-        df_matrix_pain = np.array(df[df['PRMD_ever'] == 1].iloc[:, -202:])
-        df_matrix_no_pain = np.array(df[df['PRMD_ever'] == 0].iloc[:, -202:])
-        df_matrix = np.array(df.iloc[:, -202:])
+        split_idx = df.columns.get_loc("sample_id") + 1
+        pca_cols = df.columns[split_idx:]
+        df_matrix_pain = df.loc[df['PRMD_ever'] == 1, pca_cols].to_numpy()
+        df_matrix_no_pain = df.loc[df['PRMD_ever'] == 0, pca_cols].to_numpy()
+        df_matrix = df.loc[:, pca_cols].to_numpy()
         
         mean_waveform_pain = np.mean(df_matrix_pain, axis=0)
         mean_waveform_no_pain = np.mean(df_matrix_no_pain, axis=0)

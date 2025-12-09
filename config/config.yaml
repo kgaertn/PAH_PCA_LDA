@@ -1,5 +1,5 @@
 exp_name: 'mpa'
-device: ["mocap"]
+device: ["mocap_vel"]
 measurement_tp: ['pre']
 pain_groups: ["healthy", "shoulder_neck"]
 pca_analysis:
@@ -9,7 +9,7 @@ pca_analysis:
   check_ttest_distribution: False
   rotation_method: 'varimax'
   scaler_type: 'standard_scaler'
-  nr_components: null
+  nr_components: 100
   test_t_test_assumptions: True
   t_test_assumptions_relevant: True
   t_test_distribution_type: 'normal_distribution'

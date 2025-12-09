@@ -7,6 +7,8 @@ class LDAResults:
     """Represents a principal component score for a sample."""
     id: int
     pc_ids: list[int]
+    devices: str
+    measurement_tp: str
     nr_components: int
     acc_values: List[float] | None
     acc_mean: float

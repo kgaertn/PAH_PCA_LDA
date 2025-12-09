@@ -20,6 +20,8 @@ class LDARepository(BaseRepository):
             int: The ID of the newly inserted record.
         """
         data = {
+            "devices":lda.devices,
+            "measurement_tp":lda.measurement_tp,
             "nr_components": lda.nr_components,
             "acc_values": lda.values_to_json(lda.acc_values),
             "acc_mean":lda.acc_mean,

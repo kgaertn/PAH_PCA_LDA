@@ -20,6 +20,7 @@ def main():
     - Uploading analysis results.
     """
     db_setup()
+    
     # Load configuration
     cfg = ConfigLoader.load(Path(__file__).resolve().parent.parent /  "config" / "config.yaml")
 
@@ -35,8 +36,7 @@ def main():
     runner.register_analysis(PCAAnalyser(cfg, logger, run_rotated=True))
     runner.register_analysis(TTestAnalyser(cfg, logger, run_rotated=True))
     runner.register_analysis(LDAAnalyser(cfg, logger))
-    runner.register_analysis(StatisticalAnalyser(cfg,logger))
-    #runner.register_analysis(LDAAnalyser(cfg, logger, run_rotated=True))
+    #runner.register_analysis(StatisticalAnalyser(cfg,logger)) #TODO: adjust to new structure (multiple devices)
     runner.run()
 
     print("Analysis complete.")

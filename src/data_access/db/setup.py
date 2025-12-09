@@ -1,5 +1,14 @@
 from data_access.db.connection import get_connection
 
+from data_access.models.measurement import Measurement
+from data_access.models.sample import Sample
+from data_access.models.datapoint import Datapoint
+from data_access.repositories.measurement_repository import MeasurementRepository
+from data_access.repositories.sample_repository import SampleRepository
+from data_access.repositories.datapoint_repository import DatapointRepository
+
+import pandas as pd
+
 def db_setup():
     """
     Sets up the database by:
@@ -14,6 +23,165 @@ def db_setup():
     create_complete_datapoints_view()
     create_PCA_View()
     create_LDA_View()
+    #add_measurement_type_info()
+    add_mocap_vel_acc()
+    
+    
+def add_mocap_vel_acc():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    #TEMP!!
+    #cursor.execute("""
+    #    DELETE FROM datapoint WHERE measurement_id IN (
+    #        SELECT id FROM measurement WHERE device IN ('mocap_vel', 'mocap_acc'))
+    #""")
+    #
+    #cursor.execute("""
+    #    DELETE FROM sample WHERE measurement_id IN (SELECT id FROM measurement WHERE device IN ('mocap_vel', 'mocap_acc'))
+    #""")
+    #
+    #cursor.execute("""
+    #    DELETE FROM measurement WHERE device IN ('mocap_vel', 'mocap_acc')
+    #""")
+    #conn.commit()
+    
+    #End Temp
+    cursor.execute("""
+        SELECT device FROM measurement
+            WHERE device IN ('mocap_vel', 'mocap_acc')
+    """)
+    
+    
+    rows = cursor.fetchall()
+    devices_to_upload = ['mocap_vel', 'mocap_acc'] 
+    if rows != []:
+        rows = pd.DataFrame(rows, columns=['device'])
+        existing_devices = rows['device'].unique()
+        devices_to_upload = [d for d in devices_to_upload if d not in existing_devices]
+        
+    for device in devices_to_upload:
+        if device == 'mocap_vel':
+            cursor.execute("""
+                SELECT
+                    *,
+
+                    -- Compute velocity
+                    (value - LAG(value) OVER (
+                        PARTITION BY sample_id
+                        ORDER BY dp_time_point
+                    )) /
+                    (dp_time_point - LAG(dp_time_point) OVER (
+                        PARTITION BY sample_id
+                        ORDER BY dp_time_point
+                    )) AS velocity
+
+                FROM [Complete Data]
+                WHERE device = 'mocap'
+                ORDER BY measurement_id, sample_id, bow_stroke, dp_time_point;
+            """)
+        elif device == 'mocap_acc':
+            #TODO: Adjust Query
+            cursor.execute("""
+                SELECT
+                    *,
+
+                    -- Compute velocity
+                    (value - LAG(value) OVER (
+                        PARTITION BY sample_id
+                        ORDER BY dp_time_point
+                    )) /
+                    (dp_time_point - LAG(dp_time_point) OVER (
+                        PARTITION BY sample_id
+                        ORDER BY dp_time_point
+                    )) AS acceleration
+
+                FROM [Complete Data]
+                WHERE device = 'mocap_vel'
+                ORDER BY measurement_id, sample_id, bow_stroke, dp_time_point;
+            """)
+        rows = cursor.fetchall()
+        print("data loaded for velocity and acceleration calculation")
+        if rows != []:
+            rows = pd.DataFrame(rows, columns=['experiment_id', 'name', 'participant_id', 'ext_participant_id', 'instrument', 'PRMD_shoulder_neck_right', 
+                                               'PRMD_shoulder_neck_left', 'PRMD_upper_arm_right', 'PRMD_upper_arm_left', 'PRMD_ever', 'measurement_id',
+                                               'measurement_type_id', 'timepoint', 'device', 'target', 'axis', 'unit', 'rotation_sequence',
+                                               'dp_id', 'sample_id','bow_stroke', 'up_down', 'key', 'dp_time_point', 'value', 'calculated_val'])
+            
+            measurement_ids = rows['measurement_id'].unique()
+            measurement_repo = MeasurementRepository()
+            
+            for id in measurement_ids:
+                measurement_df = rows[rows['measurement_id'] == id]
+                measurement = Measurement(
+                    id=id,
+                    participant_id=int(measurement_df['participant_id'].unique()[0]),
+                    timepoint=measurement_df['timepoint'].unique()[0],
+                    device = device,
+                    target=measurement_df['target'].unique()[0],
+                    axis=measurement_df['axis'].unique()[0],
+                    unit = "deg/s" if device == 'mocap_vel' else "deg/s^2"
+                )
+                meas_id = measurement_repo.insert_measurement(measurement)
+            
+                sample_ids = measurement_df['sample_id'].unique()
+                sample_repo = SampleRepository()
+                
+                for s_id in sample_ids:
+                    sample_df = measurement_df[measurement_df['sample_id'] == s_id]
+                    if not sample_df.empty:
+                        sample = Sample(
+                            id = s_id,
+                            measurement_id=meas_id,
+                            bow_stroke_start= min(sample_df['bow_stroke']),
+                            bow_stroke_end=max(sample_df['bow_stroke'])
+                            
+                        )
+                        sample_id = sample_repo.insert_sample(sample)
+                        
+                        sample_df['dp_time_point'] = sample_df['dp_time_point'].where(
+                                                        sample_df['dp_time_point'] <= 100,
+                                                        sample_df['dp_time_point'] - 101
+                                                    )
+                        
+                        datapoint_repo = DatapointRepository()
+                        datapoints = []
+                        dp_ids = sample_df['dp_id'].unique()
+                        for dp_id in dp_ids:
+                            dp_df = sample_df[sample_df['dp_id'] == dp_id]
+                            #bs = dp_df['']
+                            #tp = dp_df.dp_time_point
+                            #bs_tp_df = dp_df[(dp_df['bow_stroke'] == bs) & (dp_df['dp_time_point'] == tp)]
+                            datapoint = Datapoint(
+                                id=dp_id,
+                                measurement_id=meas_id,
+                                bow_stroke=int(dp_df['bow_stroke'].unique()[0]),
+                                up_down=int(dp_df['up_down'].unique()[0]),
+                                key=dp_df['key'].unique()[0],
+                                time_point=int(dp_df['dp_time_point'].unique()[0]),
+                                value=dp_df['calculated_val'].unique()[0],
+                                sample_id=sample_id
+                            )
+                            datapoints.append(datapoint)
+                        if datapoints != []:
+                            datapoint_repo.insert_many_datapoints(datapoints)
+        add_measurement_type_info()                    
+            #add_measurement_type_info()       
+        # measurement_repo insert_measurement()
+        # self.add_measurement_type_info()
+        
+        #sample = Sample(
+        #    id = stroke_id,
+        #    measurement_id=meas_id,
+        #    bow_stroke_start=bow_stroke_start,
+        #    bow_stroke_end=bow_stroke_end,
+        #)
+        
+        #TODO: create a new sample id for each sample row
+        #TODO: create a new measurement for each device (pre/post/per participant)
+        #TODO: create a new measurement type for each measurement
+        #TODO: upload the new value to the database
+        
 
 def add_measurement_type_info():
     """
@@ -227,6 +395,8 @@ def create_tables():
     
     cursor.execute("""CREATE TABLE IF NOT EXISTS lda_results (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
+        devices TEXT,
+        measurement_tp TEXT,
         nr_components INT NOT NULL,
         acc_values TEXT,
         acc_mean FLOAT,
@@ -342,12 +512,12 @@ def create_adjusted_view():
                     up_down,
                     key,
                     CASE
-                        WHEN up_down = 1 THEN time_point + 101
+                        WHEN up_down = 1 THEN time_point + 100
                         ELSE time_point
                     END AS time_point, 
                     value
                 FROM datapoint
-                WHERE sample_id IS NOT NULL;
+                WHERE sample_id IS NOT NULL AND NOT (time_point = 0 AND up_down = 1);
     """)
 
 def create_samples_view():
@@ -457,7 +627,8 @@ def create_PCA_View():
             WHERE (mt.rotation_sequence NOT IN ('carrying_angle', 'redundant') OR mt.rotation_sequence IS NULL); 
     """)
     
-    
+#TODO: view anpassen, damit device richtig angezeigt wird -> IRGENDWAS muss geändert werden -> 
+# Devices werden nicht richtig erkannt bei LDA, wenn z.B. alle Komponenten von dem selben device kommen!!
 def create_LDA_View():
     """
     Creates the 'Complete_LDA' view combining PCA-related data with pain group and participant information.
@@ -477,8 +648,8 @@ def create_LDA_View():
 
             SELECT DISTINCT
                 e.id AS exp_id, 
-                m.device, 
-                m.timepoint AS meas_time_point, 
+                lda.devices AS device,
+                lda.measurement_tp AS meas_time_point,
                 pg_agg.pain_groups,  
                 pcr.data_scaled AS pca_scaled, 
                 rot.rotation_type AS pca_rotation_type,
@@ -514,7 +685,7 @@ def create_LDA_View():
             JOIN pca_rotation AS rot ON pcr.rotation_id = rot.id
             JOIN lda_pc AS lpc ON pcr.id = lpc.pc_id
             JOIN lda_results lda ON lpc.lda_id = lda.id
-            LEFT JOIN pain_groups_agg pg_agg ON pg_agg.pc_id = pcr.id; 
+            LEFT JOIN pain_groups_agg pg_agg ON pg_agg.pc_id = pcr.id;
     """)
     
 def fill_measurement_type_table():
