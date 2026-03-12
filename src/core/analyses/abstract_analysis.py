@@ -20,8 +20,6 @@ class AbstractAnalyser:
         uploads: list of (upload_func, result) tuples
         """
         #logged = entry["uploaded_steps"].get(analysis_name)
-        #params = logged.get("params")
-        #dependencies = 
         
         #if not self.logger.is_uploaded(entry, analysis_name, params):
         for upload_func, result in uploads:

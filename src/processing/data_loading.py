@@ -14,10 +14,10 @@ from data_access.models.pc_ranked import PC_Ranked
 from data_access.models.pc_scores import PC_Scores
 from data_access.models.rotation import RotationPCA
 from data_access.models.pain_group import PainGroup
+from data_access.models.lda_results import LDAResults
 
 import pandas as pd
 from sklearn.preprocessing import StandardScaler
-import json
 
 class DataLoader:
     
@@ -222,13 +222,14 @@ class DataLoader:
         exclude= None if device == 'emg' else {'rotation_sequence': ['carrying_angle','redundant']}
         target_axes = self.meas_repo.get_advanced(
             table_or_view = 'measurement_type',
-            columns=['target', 'axis'], 
+            columns=columns, 
             exclude=exclude,
             order_by=columns,
             experiment_id = experiment,
             device = device,
             meas_time_point = meas_time_point,
             return_df=False )
+
         return target_axes  
     
     def clean_data_by_exp_device_tp_target_axis(self, exp_id:int, device:str, timepoint:str, target:str, axis:str | None = None, 
@@ -432,27 +433,28 @@ class DataLoader:
             all_pain_group_ids.extend([pain_group_id])
         return all_participant_ids, all_pain_group_ids
     
-    def get_experiment_by_name(self, exp_name):
+    def get_experiment_by_name(self, exp_name:str) -> int:
         return self.exp_repo.get_experiment_id_by_name(exp_name)
     
     def load_lda(self,exp_id:int, device:str, measurement_tp:str, pain_groups:list[str], pca_scaled:bool, select_rotated:bool, 
                     rotation_type:str, imputation_type:str, lda_scaler_type, lda_validation_type) -> pd.DataFrame:
-        """"""
-        
-    #def load_pcs_by_rank(self, exp_id:int, device:str, meas_tp:str, pain_groups:list[str], nr_components:int | None = None, select_rotated:bool = False, 
-    #                     use_distribution: bool = False, distribution_type: str | None = "normal_distribution"):
         """
-        Load principal components ordered by rank, optionally selecting rotated components.
+        Load LDA results, optionally for rotated components.
 
         Args:
-            exp_id: Experiment ID
-            device: Device name
-            meas_tp: Measurement timepoint
-            nr_components (int | None): Number of components to load (optional)
-            select_rotated (bool): Whether to load rotated PCs (default False)
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            measurement_tp (str): Measurement timepoint.
+            pain_groups (list[str]): List of pain group names.
+            pca_scaled (bool): Whether PCA scaling was applied.
+            select_rotated (bool): Whether to select rotated components.
+            rotation_type (str): Rotation method to use.
+            imputation_type: LDA imputation type.
+            lda_scaler_type: LDA scaler type.
+            lda_validation_type: LDA validation type.
 
         Returns:
-            pd.DataFrame: DataFrame of selected principal components
+            pd.DataFrame: DataFrame containing the LDA results.
         """
         pain_group_names = [", ".join(pain_groups), ", ".join(reversed(pain_groups))]
 
@@ -467,25 +469,48 @@ class DataLoader:
     
     def upload_lda_pcs(self, lda_id:int, pc_ids:list[int]):
         """
-        Associate a LDA with pc_ids.
+        Load LDA results for a given experiment, device, and measurement, optionally using rotated components.
 
         Args:
-            lda_id (int): Principal component ID.
-            pc_ids list(int): Pain group ID.
-        """
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            measurement_tp (str): Measurement timepoint.
+            pain_groups (list[str]): List of pain group names.
+            pca_scaled (bool): Whether PCA scaling was applied.
+            select_rotated (bool): Whether to select rotated components.
+            rotation_type (str): Rotation method to use if rotated components are selected.
+            imputation_type: LDA imputation type.
+            lda_scaler_type: LDA scaler type.
+            lda_validation_type: LDA validation type.
+
+        Returns:
+            pd.DataFrame: DataFrame containing the selected LDA results.
+"""
         self.lda_repo.insert_lda_pcs(lda_id, pc_ids)
         
-    def upload_lda_analysis(self, lda):
+    def upload_lda_analysis(self, lda:LDAResults)->int:
         """
-        Associate a LDA with pc_ids.
+        Insert a new LDA result into the database.
 
         Args:
-            lda_id (int): Principal component ID.
-            pc_ids list(int): Pain group ID.
+            lda: LDA results object to insert.
+
+        Returns:
+            int: ID of the newly inserted LDA record.
         """
         return self.lda_repo.insert_new_lda(lda)
     
-    def check_full_lda_uploaded(self, key, run_rotated):
+    def check_full_lda_uploaded(self, key:dict, run_rotated:bool)->bool:
+        """
+        Check whether LDA results on the full dataset (no crossvalidation) for a given experiment configuration have already been uploaded.
+
+        Args:
+            key (dict): Dictionary containing experiment and LDA configuration parameters.
+            run_rotated (bool): Whether to check for rotated components.
+
+        Returns:
+            bool: True if matching LDA results exist, False otherwise.
+        """
         exp_id = key['exp_id']
         device = key['device']
         meas_timepoint = key['measurement_tp']

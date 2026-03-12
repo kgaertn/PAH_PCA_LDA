@@ -3,6 +3,7 @@ from typing import List
 
 @dataclass
 class AnalysisConfig:
+    """Represents the configuration for planned analyses."""
     exp_id: int
     measurement_tp: str
     device: str

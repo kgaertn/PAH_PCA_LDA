@@ -9,6 +9,7 @@ class BaseRepository:
         Initializes the Repository with a database connection.
         """
         self.conn = get_connection()
+
 # region Setter
     def insert_one(self, table: str, data: dict) -> int:
         """

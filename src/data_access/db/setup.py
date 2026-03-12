@@ -17,13 +17,13 @@ def db_setup():
     - Creating multiple database views for adjusted and aggregated data.
     """
     create_tables()
+    #add_measurement_type_info('mocap_vel')
     add_columns_if_missing('datapoint', new_columns = {'sample_id': 'INTEGER'})
     create_adjusted_view()
     create_samples_view()
     create_complete_datapoints_view()
     create_PCA_View()
     create_LDA_View()
-    #add_measurement_type_info()
     add_mocap_vel_acc()
     
     
@@ -31,27 +31,15 @@ def add_mocap_vel_acc():
     conn = get_connection()
     cursor = conn.cursor()
 
-    #TEMP!!
-    #cursor.execute("""
-    #    DELETE FROM datapoint WHERE measurement_id IN (
-    #        SELECT id FROM measurement WHERE device IN ('mocap_vel', 'mocap_acc'))
-    #""")
     #
-    #cursor.execute("""
-    #    DELETE FROM sample WHERE measurement_id IN (SELECT id FROM measurement WHERE device IN ('mocap_vel', 'mocap_acc'))
-    #""")
-    #
-    #cursor.execute("""
     #    DELETE FROM measurement WHERE device IN ('mocap_vel', 'mocap_acc')
-    #""")
-    #conn.commit()
+
     
     #End Temp
     cursor.execute("""
         SELECT device FROM measurement
             WHERE device IN ('mocap_vel', 'mocap_acc')
     """)
-    
     
     rows = cursor.fetchall()
     devices_to_upload = ['mocap_vel', 'mocap_acc'] 
@@ -139,9 +127,10 @@ def add_mocap_vel_acc():
                         )
                         sample_id = sample_repo.insert_sample(sample)
                         
+                        #TODO: test if this is correct for datapoints (as one datapoint was now deleted)
                         sample_df['dp_time_point'] = sample_df['dp_time_point'].where(
                                                         sample_df['dp_time_point'] <= 100,
-                                                        sample_df['dp_time_point'] - 101
+                                                        sample_df['dp_time_point'] - 100
                                                     )
                         
                         datapoint_repo = DatapointRepository()
@@ -149,9 +138,6 @@ def add_mocap_vel_acc():
                         dp_ids = sample_df['dp_id'].unique()
                         for dp_id in dp_ids:
                             dp_df = sample_df[sample_df['dp_id'] == dp_id]
-                            #bs = dp_df['']
-                            #tp = dp_df.dp_time_point
-                            #bs_tp_df = dp_df[(dp_df['bow_stroke'] == bs) & (dp_df['dp_time_point'] == tp)]
                             datapoint = Datapoint(
                                 id=dp_id,
                                 measurement_id=meas_id,
@@ -165,33 +151,17 @@ def add_mocap_vel_acc():
                             datapoints.append(datapoint)
                         if datapoints != []:
                             datapoint_repo.insert_many_datapoints(datapoints)
-        add_measurement_type_info()                    
-            #add_measurement_type_info()       
-        # measurement_repo insert_measurement()
-        # self.add_measurement_type_info()
+        add_measurement_type_info(device)                   
         
-        #sample = Sample(
-        #    id = stroke_id,
-        #    measurement_id=meas_id,
-        #    bow_stroke_start=bow_stroke_start,
-        #    bow_stroke_end=bow_stroke_end,
-        #)
-        
-        #TODO: create a new sample id for each sample row
-        #TODO: create a new measurement for each device (pre/post/per participant)
-        #TODO: create a new measurement type for each measurement
-        #TODO: upload the new value to the database
-        
-
-def add_measurement_type_info():
+def add_measurement_type_info(device = None):
     """
     Updates the 'measurement_type' table and related tables by:
     - Populating the measurement_type table with data from the measurement table.
     - Updating measurement records with the corresponding measurement_type_id.
     - Adding rotation sequence information based on target and axis data.
     """
-    fill_measurement_type_table()
-    add_measurement_type_id_to_measurement()    
+    fill_measurement_type_table(device)
+    add_measurement_type_id_to_measurement(device)    
     add_rotation_sequence()    
 
 def create_tables():
@@ -627,8 +597,6 @@ def create_PCA_View():
             WHERE (mt.rotation_sequence NOT IN ('carrying_angle', 'redundant') OR mt.rotation_sequence IS NULL); 
     """)
     
-#TODO: view anpassen, damit device richtig angezeigt wird -> IRGENDWAS muss geändert werden -> 
-# Devices werden nicht richtig erkannt bei LDA, wenn z.B. alle Komponenten von dem selben device kommen!!
 def create_LDA_View():
     """
     Creates the 'Complete_LDA' view combining PCA-related data with pain group and participant information.
@@ -688,47 +656,79 @@ def create_LDA_View():
             LEFT JOIN pain_groups_agg pg_agg ON pg_agg.pc_id = pcr.id;
     """)
     
-def fill_measurement_type_table():
+def fill_measurement_type_table(device = None):
     """
     Inserts distinct combinations of experiment_id, device, timepoint, target, and axis from the
     measurement table into the measurement_type table, ignoring duplicates.
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(f"""
-        INSERT OR IGNORE INTO measurement_type (experiment_id, device, meas_time_point, target, axis)
-        SELECT DISTINCT
-        p.experiment_id,
-        m.device,
-        m.timepoint,
-        m.target,
-        m.axis
-        FROM measurement m
-        JOIN participant p ON m.participant_id = p.id;
-    """)
+    if device == None:
+        cursor.execute(f"""
+            INSERT OR IGNORE INTO measurement_type (experiment_id, device, meas_time_point, target, axis)
+            SELECT DISTINCT
+            p.experiment_id,
+            m.device,
+            m.timepoint,
+            m.target,
+            m.axis
+            FROM measurement m
+            JOIN participant p ON m.participant_id = p.id;
+        """)
+    else:
+        query = f"""
+            INSERT OR IGNORE INTO measurement_type (experiment_id, device, meas_time_point, target, axis)
+            SELECT DISTINCT
+            p.experiment_id,
+            m.device,
+            m.timepoint,
+            m.target,
+            m.axis
+            FROM measurement m
+            JOIN participant p ON m.participant_id = p.id
+            WHERE m.device = ?;
+        """  
+        cursor.execute(query, (device,))      
     conn.commit()
     
-def add_measurement_type_id_to_measurement():
+def add_measurement_type_id_to_measurement(device):
     """
     Updates measurement records with a NULL measurement_type_id by assigning the matching measurement_type.id
     based on experiment_id, device, timepoint, target, and axis.
     """
     conn = get_connection()
     cursor = conn.cursor()
-    cursor.execute(f"""
-        UPDATE measurement
-            SET measurement_type_id = (
-            SELECT mt.id
-            FROM measurement_type mt
-            JOIN participant p ON measurement.participant_id = p.id
-            WHERE measurement.timepoint = mt.meas_time_point
-                AND measurement.target = mt.target
-                AND measurement.axis IS mt.axis
-                AND measurement.device = mt.device
-                AND p.experiment_id = mt.experiment_id
-            )
-            WHERE measurement_type_id IS NULL;
-    """)
+    if device == None:
+        cursor.execute(f"""
+            UPDATE measurement
+                SET measurement_type_id = (
+                SELECT mt.id
+                FROM measurement_type mt
+                JOIN participant p ON measurement.participant_id = p.id
+                WHERE measurement.timepoint = mt.meas_time_point
+                    AND measurement.target = mt.target
+                    AND measurement.axis IS mt.axis
+                    AND measurement.device = mt.device
+                    AND p.experiment_id = mt.experiment_id
+                )
+                WHERE measurement_type_id IS NULL;
+        """)
+    else:
+        query = f"""
+            UPDATE measurement
+                SET measurement_type_id = (
+                SELECT mt.id
+                FROM measurement_type mt
+                JOIN participant p ON measurement.participant_id = p.id
+                WHERE measurement.timepoint = mt.meas_time_point
+                    AND measurement.target = mt.target
+                    AND measurement.axis IS mt.axis
+                    AND measurement.device = mt.device
+                    AND p.experiment_id = mt.experiment_id
+                )
+                WHERE measurement_type_id IS NULL AND device = ?;
+        """
+        cursor.execute(query, (device,))
     conn.commit()    
 
 def add_rotation_sequence():

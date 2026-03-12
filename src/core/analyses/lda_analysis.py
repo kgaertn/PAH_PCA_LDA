@@ -20,6 +20,9 @@ from sklearn.pipeline import make_pipeline
 from itertools import combinations
 import json
 
+#TEMP
+from collections import Counter
+
 class LDAAnalyser(AbstractAnalyser):
     def __init__(self, cfg, logger, run_rotated = False):
         super().__init__(cfg, logger)
@@ -69,6 +72,7 @@ class LDAAnalyser(AbstractAnalyser):
         nr_components = key["lda_nr_components"]
         
         all_results = []
+        cis_info_all = []
         # Loop through subsets of variables (2 up to 10)
         for k in range(2, nr_components + 1):
             #for subset in combinations(range(prepared_data.shape[1]), k):
@@ -100,10 +104,43 @@ class LDAAnalyser(AbstractAnalyser):
             acc_values_all = []
             roc_auc_values_all = []
             feature_imp_all = []
-
+            
+            
+            fold_info_all = []
             for rep in range(n_repeats):
                 #gkf = StratifiedGroupKFold(n_splits=n_folds, shuffle=True, random_state=rep)
                 cvf = self.get_cross_validater(validation_type, n_folds, rep)
+                #y = np.array(PRMD_clean)
+                #groups = np.array(part_ids_clean)
+                overall_pos_rate = np.array(PRMD_clean).mean()
+                
+                for fold_idx, (train_idx, test_idx) in enumerate(cvf.split(pc_scores_clean, PRMD_clean, groups=part_ids_clean)):
+                    y_train, y_test = PRMD_clean[train_idx], PRMD_clean[test_idx]
+                    g_train, g_test = part_ids_clean[train_idx], part_ids_clean[test_idx]
+                    fold_info = {
+                        'nr_k': k,
+                        'repeat': rep,
+                        'fold': fold_idx,
+                        'n_total_train': len(train_idx),
+                        'n_total_test': len(test_idx),
+                        'n_train_class_nopain': Counter(y_train)[0],
+                        'n_train_class_pain': Counter(y_train)[1],
+                        'n_test_class_nopain': Counter(y_test)[0],
+                        'n_test_class_pain': Counter(y_test)[1],
+                        'n_groups_train': len(set(g_train)),
+                        'n_groups_test': len(set(g_test)),
+                        'pos_prevalence_train': y_train.mean(),
+                        'pos_prevalence_test': y_test.mean(),
+                        'pos_rate_overall': overall_pos_rate,
+                        'imbalance_ratio_train': Counter(y_train)[0] / Counter(y_train)[1] if Counter(y_train)[1] > 0 else np.nan,
+                        'imbalance_ratio_test': Counter(y_test)[0] / Counter(y_test)[1] if Counter(y_test)[1] > 0 else np.nan,
+                        'train_no_pain_count': Counter(y_train)[0],
+                        'train_pain_count': Counter(y_train)[1],
+                        'test_no_pain_count': Counter(y_test)[0],
+                        'test_pain_count': Counter(y_test)[1],
+                    }
+                    fold_info_all.append(fold_info)
+                
                 scores = cross_validate(pipe, pc_scores_clean, PRMD_clean, cv=cvf, groups=part_ids_clean, 
                                         scoring=["accuracy", "roc_auc"], error_score="raise", return_estimator=True)
                 coefs = np.array([est.named_steps['lineardiscriminantanalysis'].coef_[0] for est in scores['estimator']])
@@ -112,6 +149,116 @@ class LDAAnalyser(AbstractAnalyser):
                 acc_values_all.extend(scores['test_accuracy'])
                 roc_auc_values_all.extend(scores['test_roc_auc'])
                 feature_imp_all.append(mean_feature_importance)
+
+            # per-fold dataframe (already exists)
+            df_folds = pd.DataFrame(fold_info_all)
+
+            df_folds['balance_deviation'] = abs(
+                df_folds['pos_prevalence_test'] - df_folds['pos_rate_overall']
+            )
+            df_folds['balance_deviation_pct'] = df_folds['balance_deviation'] * 100
+
+            # summary as a small table
+            summary = pd.DataFrame({
+                "metric": [
+                    "n_components",
+                    "n_folds",
+                    "n_repeats",
+                    "pos_prevalence_train",
+                    "pos_prevalence_test",
+                    "pos_prevalence_train_SD",
+                    "pos_prevalence_test_SD",
+                    "imbalance_ratio_train",
+                    "imbalance_ratio_test",
+                    "imbalance_ratio_train_SD",
+                    "imbalance_ratio_test_SD",
+                    "n_total_train",
+                    "n_total_test",
+                    "n_train_class_nopain_mean",
+                    "n_train_class_pain_mean",
+                    "n_train_class_nopain_SD",
+                    "n_train_class_pain_SD",                    
+                    "n_test_class_nopain_mean",
+                    "n_test_class_pain_mean",
+                    "n_test_class_nopain_SD",
+                    "n_test_class_pain_SD",   
+                    "90th percentile deviation (%)",
+                    "95th percentile deviation (%)",
+                    "Worst fold deviation (%)",
+                    "Mean deviation (%)",
+                    "Median deviation (%)",
+                    "<5% deviation (%)",
+                    "<10% deviation (%)",
+                    "<20% deviation (%)",
+                ],
+                "value": [
+                    int(k),
+                    int(len(df_folds)),
+                    int(n_repeats),
+                    df_folds['pos_prevalence_train'].mean(),
+                    df_folds['pos_prevalence_test'].mean(),
+                    df_folds['pos_prevalence_train'].std(),
+                    df_folds['pos_prevalence_test'].std(),
+                    df_folds['imbalance_ratio_train'].mean(),
+                    df_folds['imbalance_ratio_test'].mean(),
+                    df_folds['imbalance_ratio_train'].std(),
+                    df_folds['imbalance_ratio_test'].std(),
+                    df_folds['n_total_train'].mean(),
+                    df_folds['n_total_test'].mean(),
+                    df_folds['n_train_class_nopain'].mean(),
+                    df_folds['n_train_class_pain'].mean(),
+                    df_folds['n_train_class_nopain'].std(),
+                    df_folds['n_train_class_pain'].std(),
+                    df_folds['n_test_class_nopain'].mean(),
+                    df_folds['n_test_class_pain'].mean(),
+                    df_folds['n_test_class_nopain'].std(),
+                    df_folds['n_test_class_pain'].std(),
+                    df_folds['balance_deviation_pct'].quantile(0.90),
+                    df_folds['balance_deviation_pct'].quantile(0.95),
+                    df_folds['balance_deviation_pct'].max(),
+                    df_folds['balance_deviation_pct'].mean(),
+                    df_folds['balance_deviation_pct'].median(),
+                    (df_folds['balance_deviation_pct'] < 5).mean() * 100,
+                    (df_folds['balance_deviation_pct'] < 10).mean() * 100,
+                    (df_folds['balance_deviation_pct'] < 20).mean() * 100,
+                ]
+            })
+
+            filename = f"k_{k}_balance_nfolds{n_folds}_nrepeats{n_repeats}_{validation_type}.xlsx"
+
+            with pd.ExcelWriter("output/csvs/" + filename) as writer:
+                df_folds.to_excel(writer, sheet_name="folds", index=False)
+                summary.to_excel(writer, sheet_name="summary", index=False)
+            
+            ## After the loop, save to CSV
+            #df_folds = pd.DataFrame(fold_info_all)
+#
+#
+            #df_folds['balance_deviation'] = abs(df_folds['pos_rate_test'] - df_folds['pos_rate_overall'])
+            #df_folds['balance_deviation_pct'] = df_folds['balance_deviation'] * 100
+#
+            #print("=== CV BALANCE SUMMARY ===")
+            #print(f"Nr. components: {k}")
+            #print(f"Alle Folds (N={len(df_folds)}):")
+            #print(f"  90th percentile deviation: {df_folds['balance_deviation_pct'].quantile(0.90):.1f}%")
+            #print(f"  95th percentile deviation: {df_folds['balance_deviation_pct'].quantile(0.95):.1f}%")
+            #print(f"  Worst fold:               {df_folds['balance_deviation_pct'].max():.1f}%")
+            #print(f"  Mean deviation:           {df_folds['balance_deviation_pct'].mean():.1f}%")
+            #print(f"  Median deviation:         {df_folds['balance_deviation_pct'].median():.1f}%")
+#
+            #print("\nProzentualer Anteil guter Folds:")
+            #print(f"  <5% deviation:  { (df_folds['balance_deviation_pct'] < 5).mean()*100:.1f}%")
+            #print(f"  <10% deviation: { (df_folds['balance_deviation_pct'] < 10).mean()*100:.1f}%")
+            #print(f"  <20% deviation: { (df_folds['balance_deviation_pct'] < 20).mean()*100:.1f}%")
+#
+            ## Create filename with timestamp or parameters
+            #filename = f"k_{k}_balance_nfolds{n_folds}_nrepeats{n_repeats}_{validation_type}.csv"
+            #df_folds.to_csv('output/csvs/'+ filename, index=False, sep = ';', decimal=',')
+
+            mean_acc = np.mean(acc_values_all)
+            se_acc = np.std(acc_values_all, ddof=1) / np.sqrt(len(acc_values_all))
+            ci_acc = mean_acc - 1.96*se_acc, mean_acc + 1.96*se_acc
+            cis_info_all.append([k, mean_acc, se_acc, ci_acc[0], ci_acc[1]])
 
             acc_values_all = np.array(acc_values_all)
             roc_auc_values_all = np.array(roc_auc_values_all)
@@ -217,7 +364,10 @@ class LDAAnalyser(AbstractAnalyser):
                 )
 
                 all_results.append(result)            
-            
+         
+        cis_info_all = pd.DataFrame(cis_info_all, columns = ['nr_components', 'mean_acc', 'standard_error', 'ci_lower', 'ci_upper'])    
+        filename = f"confidence_intervalls_LDA.csv"
+        cis_info_all.to_csv('output/csvs/'+ filename, index=False, sep = ';', decimal=',')
         return all_results
 
     @staticmethod
@@ -431,7 +581,8 @@ class LDAAnalyser(AbstractAnalyser):
     
     def plot_lda_results(self, lda_results_cv, lda_results_full):
         column_names = ['missclass_err_values', 'missclass_err_mean']
-        fig = self.data_plotter.plot_lda_boxlpots(lda_results_cv, lda_results_full, column_names)   
+        fig = self.data_plotter.plot_lda_boxlpots(lda_results_cv, lda_results_full, column_names) 
+        fig_CI =   self.data_plotter.plot_lda_boxlpots_CI(lda_results_cv, lda_results_full, column_names) 
     
         #distribution_label = f"{t_test_distribution_type}" if t_test_assumptions_relevant else "no_distribution_tested"
         rotation_label = lda_results_cv['pca_rotation_type'].unique()[0]
@@ -447,20 +598,28 @@ class LDAAnalyser(AbstractAnalyser):
         output_path.mkdir(parents=True, exist_ok=True)
         
         fig_name = f"{measurement_tp}_LDA_Results_Missclassification_Error"
+        fig_name_CI = f"{measurement_tp}_LDA_Results_Missclassification_Error_CI"
         self.data_plotter.save_plot(fig, output_path, fig_name)
+        self.data_plotter.save_plot(fig_CI, output_path, fig_name_CI)
         
         column_names = ['roc_auc_values', 'roc_auc_mean']
         fig = self.data_plotter.plot_lda_boxlpots(lda_results_cv, lda_results_full, column_names) 
+        fig_CI =   self.data_plotter.plot_lda_boxlpots_CI(lda_results_cv, lda_results_full, column_names) 
         
         fig_name = f"{measurement_tp}_LDA_Results_ROC_AUC"
-        self.data_plotter.save_plot(fig, output_path, fig_name)        
+        fig_name_CI = f"{measurement_tp}_LDA_Results_ROC_AUC_CI"
+        self.data_plotter.save_plot(fig, output_path, fig_name)
+        self.data_plotter.save_plot(fig_CI, output_path, fig_name_CI)    
     
     
         column_names = ['acc_values', 'acc_mean']
         fig = self.data_plotter.plot_lda_boxlpots(lda_results_cv, lda_results_full, column_names) 
+        fig_CI =   self.data_plotter.plot_lda_boxlpots_CI(lda_results_cv, lda_results_full, column_names) 
         
         fig_name = f"{measurement_tp}_LDA_Results_Accuracy"
-        self.data_plotter.save_plot(fig, output_path, fig_name)     
+        fig_name_CI = f"{measurement_tp}_LDA_Results_Accuracy_CI"
+        self.data_plotter.save_plot(fig, output_path, fig_name)
+        self.data_plotter.save_plot(fig_CI, output_path, fig_name_CI)      
     #def preprocess(self, X_train, X_test):
     #    """Fit scaler on training and transform both train and test data."""
     #    self.scaler.fit(X_train)

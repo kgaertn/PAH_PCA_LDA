@@ -4,7 +4,7 @@ import json
 
 @dataclass
 class LDAResults:
-    """Represents a principal component score for a sample."""
+    """Represents the results for a single LDA."""
     id: int
     pc_ids: list[int]
     devices: str

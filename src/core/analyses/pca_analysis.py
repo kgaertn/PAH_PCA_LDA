@@ -71,7 +71,12 @@ class PCAAnalyser(AbstractAnalyser):
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
         
         total_pca_info = {}
-        for target, axis in existing_target_axes:
+        for row in existing_target_axes:
+            target = row[0]
+            if len(row) > 1:
+                axis = row[1]
+            else:
+                axis = None
             prepared_data = self.prepare(key, target, axis)
             #if check_requirements:
             #    self.check_pca_requirements(prepared_data=prepared_data, target=target, axis=axis, pain_groups=pain_groups)
@@ -541,6 +546,7 @@ class PCAAnalyser(AbstractAnalyser):
         else:
             device = devices
         
+        device_path = device[0] if type(device) == list else device
         #TODO: check how PCs are ranked here
         ranked_pc_scores_df = self.data_loader.load_pcs_by_rank(exp_id, devices,measurement_tp,pain_groups, 
                                                                 nr_components= nr_components,select_rotated= select_rotated, 
@@ -557,10 +563,10 @@ class PCAAnalyser(AbstractAnalyser):
         for id, pc_id in enumerate(ranked_pc_scores_df['pc_id'].unique()):
             rank = id+1
             current_pc_df = ranked_pc_scores_df[ranked_pc_scores_df['pc_id'] == pc_id]
-            target, axis = current_pc_df['target'].unique()[0], current_pc_df['axis'].unique()[0]
+            dev, target, axis = current_pc_df['device'].unique()[0], current_pc_df['target'].unique()[0], current_pc_df['axis'].unique()[0]
             measurement_type_id = int(current_pc_df['meas_type_id'].unique()[0])
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
-            df = self.data_loader.clean_data_by_exp_device_tp_target_axis(exp_id, devices, measurement_tp, target, axis, participant_ids)
+            df = self.data_loader.clean_data_by_exp_device_tp_target_axis(exp_id, dev, measurement_tp, target, axis, participant_ids)
             df_reduced = df[[
                     'participant_id', 'ext_participant_id', 'PRMD_ever',
                     'measurement_id','measurement_type_id', 'target', 'axis', 'sample_id', 'bow_stroke', 'up_down', 'key', 'dp_time_point',
@@ -595,22 +601,23 @@ class PCAAnalyser(AbstractAnalyser):
             #dev = device[0] if type(device) == list else device
             #tp = measurement_tp[0] if type(measurement_tp) == list else measurement_tp
             
+            
             current_path = Path.cwd()
-            output_path = current_path / "output" / "plots" /f"{device}" / "PCA_Reconstruction" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
+            output_path = current_path / "output" / "plots" /f"{device_path}" / "PCA_Reconstruction" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
             output_path.mkdir(parents=True, exist_ok=True)
             fig_name = f"{tp}{rotated_suffix_fname}_Rank_{rank}_{target}_{axis}_{pc_name}"
             self.data_plotter.save_plot(fig, output_path, fig_name)
         
         fig = self.data_plotter.plot_top_3_PCAs(orig_data_top_3_components, top_3_components)
         current_path = Path.cwd()
-        output_path = current_path / "output" / "plots" /f"{device}" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
+        output_path = current_path / "output" / "plots" /f"{device_path}" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
         output_path.mkdir(parents=True, exist_ok=True)
         fig_name = f"{tp}_{rotated_suffix_fname}_TOP_3_PCs"
         self.data_plotter.save_plot(fig, output_path, fig_name)
         
         fig = self.data_plotter.plot_top_3_PCAs_reduced(orig_data_top_3_components, top_3_components)
         current_path = Path.cwd()
-        output_path = current_path / "output" / "plots" /f"{device}" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
+        output_path = current_path / "output" / "plots" /f"{device_path}" / "PCA_Top_3" / f"{pain_group_names}" / f"{distribution_label}" / f"{rotation_label}"
         output_path.mkdir(parents=True, exist_ok=True)
         fig_name = f"{tp}_{rotated_suffix_fname}_TOP_3_PCs_reduced"
         self.data_plotter.save_plot(fig, output_path, fig_name)

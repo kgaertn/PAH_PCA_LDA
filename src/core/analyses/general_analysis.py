@@ -20,26 +20,24 @@ class GeneralAnalyser(AbstractAnalyser):
 
     def run(self, key):
         """"""
-        device = key['device']
+        devices = key['device']
         exp_id = key['exp_id'] 
         measurement_tp = key['measurement_tp'] 
         pain_groups = key['pain_groups'] 
         create_general_plots = key['create_general_plots']  
         
         if create_general_plots:
-            self.create_plots_key_per_group(device, exp_id, measurement_tp, pain_groups)
-            self.create_plots_mean_std_keys(device, exp_id, measurement_tp, pain_groups)
-            self.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups)
-            self.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups, key_diff_controlled=True)
+            for device in devices:
+                self.create_plots_key_per_group(device, exp_id, measurement_tp, pain_groups)
+                self.create_plots_mean_std_keys(device, exp_id, measurement_tp, pain_groups)
+                self.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups)
+                self.create_plots_mean_std(device, exp_id, measurement_tp, pain_groups, key_diff_controlled=True)
             #self.create_plots_key_per_participant(device, exp_id, measurement_tp, pain_groups)
         return None
     
 
     def handle_results(self, results, entry):
         """TODO"""
-        ##self.upload_pca_analysis(results)
-        #self._upload_step(entry = entry, analysis_name=self.analysis_name , upload_func=self.data_loader.upload_distribution_info, 
-        #                  result = results)
                      
     def create_plots_mean_std(self, device:str, exp_id:int, measurement_tp:str, pain_groups:list[str], key_diff_controlled:bool = False):
         """
@@ -54,20 +52,25 @@ class GeneralAnalyser(AbstractAnalyser):
         """
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
         pain_group_names = self.concat_pain_groups(pain_groups)
-        for target, axis in existing_target_axes:
+        for row in existing_target_axes:
+            target = row[0]
+            if len(row) > 1:
+                axis = row[1]
+            else:
+                axis = None
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df_pain = self.data_loader.clean_data_by_exp_device_tp_target_axis(exp_id, device, measurement_tp, target, axis, participant_ids)
             pain_group_names = self.concat_pain_groups(pain_groups)
             
             if type(measurement_tp) == list and len(measurement_tp) > 1:
-                tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+                tp = ", ".join(measurement_tp)
             else:
                 tp = measurement_tp[0]
                 
             if type(device) == list and len(device) > 1:
-                dev =  [", ".join(device), ", ".join(reversed(device))]
+                dev =  ", ".join(device)
             else:
-                dev = device[0]     
+                dev = device   
                 
             filename = f"{tp}_{pain_group_names}_Original_Mean_Std_{target}_{axis}"
             if key_diff_controlled:
@@ -98,7 +101,12 @@ class GeneralAnalyser(AbstractAnalyser):
         """
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
         #pain_group_names = self.concat_pain_groups(pain_groups)
-        for target, axis in existing_target_axes:
+        for row in existing_target_axes:
+            target = row[0]
+            if len(row) > 1:
+                axis = row[1]
+            else:
+                axis = None
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df_pain = self.data_loader.clean_data_by_exp_device_tp_target_axis(
                 exp_id, device, measurement_tp, target, axis, participant_ids
@@ -142,14 +150,14 @@ class GeneralAnalyser(AbstractAnalyser):
             fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
             if type(measurement_tp) == list and len(measurement_tp) > 1:
-                tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+                tp = ", ".join(measurement_tp)
             else:
                 tp = measurement_tp[0]
                 
             if type(device) == list and len(device) > 1:
-                dev =  [", ".join(device), ", ".join(reversed(device))]
+                dev =  ", ".join(device)
             else:
-                dev = device[0]
+                dev = device
                 
             output_path = Path.cwd() / "output" / "plots" /f"{dev}" / "Mean_Std" / "bow_stroke_pairs" / f"{pain_group_names}"
             output_path.mkdir(parents=True, exist_ok=True)
@@ -186,7 +194,12 @@ class GeneralAnalyser(AbstractAnalyser):
         """
         existing_target_axes = self.data_loader.get_existing_target_axis_exp(exp_id, device, measurement_tp)
         pain_group_names = self.concat_pain_groups(pain_groups)
-        for target, axis in existing_target_axes:
+        for row in existing_target_axes:        
+            target = row[0]
+            if len(row) > 1:
+                axis = row[1]
+            else: 
+                axis = None
             participant_ids, pain_group_ids = self.data_loader.get_participants_pain_groups(pain_groups)
             df_pain = self.data_loader.clean_data_by_exp_device_tp_target_axis(
                 exp_id, device, measurement_tp, target, axis, participant_ids
@@ -226,14 +239,14 @@ class GeneralAnalyser(AbstractAnalyser):
             fig.tight_layout()
             
             if type(measurement_tp) == list and len(measurement_tp) > 1:
-                tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+                tp = ", ".join(measurement_tp)
             else:
                 tp = measurement_tp[0]
                 
             if type(device) == list and len(device) > 1:
-                dev =  [", ".join(device), ", ".join(reversed(device))]
+                dev =  ", ".join(device)
             else:
-                dev = device[0]
+                dev = device
             
             output_path = Path.cwd() / "output" / "plots" /f"{dev}" /  "Mean_Std" / "keys_per_group" / f"{pain_group_names}"
             output_path.mkdir(parents=True, exist_ok=True)
@@ -302,14 +315,14 @@ class GeneralAnalyser(AbstractAnalyser):
                 target_str = target.replace(" ", "_")
                 
                 if type(measurement_tp) == list and len(measurement_tp) > 1:
-                    tp = [", ".join(measurement_tp), ", ".join(reversed(measurement_tp))]
+                    tp = ", ".join(measurement_tp)
                 else:
                     tp = measurement_tp[0]
                     
                 if type(device) == list and len(device) > 1:
-                    dev =  [", ".join(device), ", ".join(reversed(device))]
+                    dev =  ", ".join(device)
                 else:
-                    dev = device[0]
+                    dev = device
                 
                 output_path = Path.cwd() / "output" / "plots" /f"{dev}" / "Mean_Std" / "keys_per_participant" / f"{pain_group_names}"/ f"{target_str}_{axis}" 
                 output_path.mkdir(parents=True, exist_ok=True)

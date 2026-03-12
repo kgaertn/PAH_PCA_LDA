@@ -36,7 +36,7 @@ def main():
     runner.register_analysis(PCAAnalyser(cfg, logger, run_rotated=True))
     runner.register_analysis(TTestAnalyser(cfg, logger, run_rotated=True))
     runner.register_analysis(LDAAnalyser(cfg, logger))
-    #runner.register_analysis(StatisticalAnalyser(cfg,logger)) #TODO: adjust to new structure (multiple devices)
+    #runner.register_analysis(StatisticalAnalyser(cfg,logger)) #TODO: adjust to new structure (multiple devices and EMG!)
     runner.run()
 
     print("Analysis complete.")

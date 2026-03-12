@@ -10,15 +10,3 @@ class Measurement:
     target: str    
     axis: str                     
     unit: str                 
-    
-
-# potentially expandable
-@dataclass
-class EMGMeasurement(Measurement):
-    """Represents an EMG measurement for a specific muscle."""
-    muscle: str
-
-@dataclass
-class MocapMeasurement(Measurement):
-    """Represents a motion capture measurement for a specific joint."""
-    joint: str

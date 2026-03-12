@@ -83,7 +83,6 @@ class PCScoresRepository(BaseRepository):
         device_ph = ",".join(["?"] * len(device_list))
         tp_ph = ",".join(["?"] * len(tp_list))
         pain_ph = ",".join(["?"] * len(pain_group_names))
-        #placeholders = ','.join(['?'] * len(pain_group_names))
 
         distribution_clause = ""
         distribution_param = []
@@ -121,7 +120,7 @@ class PCScoresRepository(BaseRepository):
                 WHERE pc_id IN (SELECT pc_id FROM top_pcs)
                 ORDER BY ABS(t_value) DESC
             """
-            #params = [exp_id, device, meas_timepoint] + pain_group_names + distribution_param + [nr_components]
+            
             params = (
                 [exp_id]
                 + device_list
@@ -152,7 +151,6 @@ class PCScoresRepository(BaseRepository):
                 )
                 ORDER BY ABS(t_value) DESC
             """
-            #params = [exp_id, device, meas_timepoint] + pain_group_names + distribution_param
             params = (
                 [exp_id]
                 + device_list

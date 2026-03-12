@@ -78,7 +78,7 @@ class ParticipantRepository(BaseRepository):
         rows = self.get_advanced(
             table_or_view="participant",
             columns=["participant_id"],
-            experiment_id=exp_id,  # <- direkt, nicht als dict
+            experiment_id=exp_id,
             distinct=True,
             return_df=False
         )

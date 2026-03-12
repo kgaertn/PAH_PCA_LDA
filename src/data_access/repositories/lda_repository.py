@@ -4,20 +4,20 @@ from data_access.models.lda_results import LDAResults
 class LDARepository(BaseRepository):
     def __init__(self):
         """
-        Initializes the PCRankedRepository with a database connection by calling the parent constructor.
+        Initializes the LDARepository with a database connection by calling the parent constructor.
         """
         super().__init__()
 
 # region Setter
     def insert_new_lda(self, lda: LDAResults):
         """
-        Inserts a new PC_Ranked record into the 'pcs_ranked' table.
+        Insert a single LDA results record into the database.
 
         Args:
-            pc (PC_Ranked): The PC_Ranked model instance to insert.
+            lda (LDAResults): The LDA results object to insert.
 
         Returns:
-            int: The ID of the newly inserted record.
+            int: ID of the inserted LDA record.
         """
         data = {
             "devices":lda.devices,
@@ -48,15 +48,15 @@ class LDARepository(BaseRepository):
         return self.insert_one("lda_results", data)
 
 # region Setter
-    def insert_many_pc_scores(self, ldas: list[LDAResults])-> int:
+    def insert_many_lda_scores(self, ldas: list[LDAResults])-> int:
         """
-        Inserts multiple PC_Scores records into the 'pc_scores' table.
+        Insert multiple LDA score summary records into the database.
 
         Args:
-            pc_scores (list[PC_Scores]): A list of PC_Scores model instances to be inserted.
+            ldas (list[LDAResults]): List of LDA results objects to insert.
 
         Returns:
-            int: The number of inserted records or the result from insert_many (depending on implementation).
+            int: Number of inserted records.
         """
         data_list = [{
             "nr_components": lda.nr_components,
@@ -73,48 +73,63 @@ class LDARepository(BaseRepository):
     
     def insert_lda_pcs(self, lda_id: int, pc_ids: list[int]):
         """
-        Inserts multiple participant-pain group associations in bulk.
+        Create LDA-to-PC association records for a given LDA result.
 
         Args:
-            participant_ids (list[int]): List of participant IDs.
-            pain_group_id (int): The pain group ID to assign.
+            lda_id (int): The LDA result ID.
+            pc_ids (list[int]): List of PC IDs to link to the LDA record.
         """
         data = [{"lda_id": lda_id, "pc_id": pid} for pid in pc_ids]
         self.insert_many("lda_pc", data)
  
 
 # region Getter
-# To be implemented
     def get_lda_results(self, exp_id, device, measurement_tp, pain_group_names, pca_scaled, rotation_type, lda_imputation_type, 
             lda_scaler_type, lda_validation_type):
+
+        """
+        Retrieve LDA results matching the specified experiment and analysis filters.
+
+        Args:
+            exp_id (int): Experiment ID.
+            device (str): Device name.
+            measurement_tp (str): Measurement timepoint.
+            pain_group_names (str): Pain group labels.
+            pca_scaled (str): PCA scaling type.
+            rotation_type (str): PCA rotation method.
+            lda_imputation_type (str): LDA imputation type.
+            lda_scaler_type (str): LDA scaler type.
+            lda_validation_type (str): LDA validation method.
+
+        Returns:
+            DataFrame: Retrieved and decoded LDA results.
+        """
+        filters = {
+            "exp_id": exp_id,
+            "device": device,
+            "meas_time_point": measurement_tp,
+            "pain_groups": pain_group_names,
+            "pca_scaled": pca_scaled,
+            "pca_rotation_type":rotation_type,
+            "lda_imputation_type":lda_imputation_type,
+            "lda_scaler_type":lda_scaler_type,
+            "lda_validation_type": lda_validation_type
+        }
         
-            #pain_group_names = [", ".join(pain_groups), ", ".join(reversed(pain_groups))]
-            filters = {
-                "exp_id": exp_id,
-                "device": device,
-                "meas_time_point": measurement_tp,
-                "pain_groups": pain_group_names,
-                "pca_scaled": pca_scaled,
-                "pca_rotation_type":rotation_type,
-                "lda_imputation_type":lda_imputation_type,
-                "lda_scaler_type":lda_scaler_type,
-                "lda_validation_type": lda_validation_type
-            }
-            
-            rows = self.get(table_or_view="[Complete_LDA]", **filters)
-            
-            if rows is not None:
-                for index, row in rows.iterrows():
-                    rows.at[index, 'acc_values'] = LDAResults.list_from_json(rows.loc[index, 'acc_values'])
-                    rows.at[index, 'missclass_err_values'] = LDAResults.list_from_json(rows.loc[index, 'missclass_err_values'])
-                    rows.at[index, 'roc_auc_values'] = LDAResults.list_from_json(rows.loc[index, 'roc_auc_values'])
-                    rows.at[index, 'stacked_feature_values'] = LDAResults.list_from_json(rows.loc[index, 'stacked_feature_values'])
-                    rows.at[index, 'feature_imp_mean'] = LDAResults.list_from_json(rows.loc[index, 'feature_imp_mean'])
-                    rows.at[index, 'feature_imp_sd'] = LDAResults.list_from_json(rows.loc[index, 'feature_imp_sd'])
-                    rows.at[index, 'feature_description'] = LDAResults.list_from_json(rows.loc[index, 'feature_description'])
-                    rows.at[index, 'lda_scores'] = LDAResults.list_from_json(rows.loc[index, 'lda_scores'])
-                    rows.at[index, 'lda_scalings'] = LDAResults.list_from_json(rows.loc[index, 'lda_scalings'])
-                    rows.at[index, 'lda_class_means'] = LDAResults.list_from_json(rows.loc[index, 'lda_class_means'])
-            return rows
+        rows = self.get(table_or_view="[Complete_LDA]", **filters)
+        
+        if rows is not None:
+            for index, row in rows.iterrows():
+                rows.at[index, 'acc_values'] = LDAResults.list_from_json(rows.loc[index, 'acc_values'])
+                rows.at[index, 'missclass_err_values'] = LDAResults.list_from_json(rows.loc[index, 'missclass_err_values'])
+                rows.at[index, 'roc_auc_values'] = LDAResults.list_from_json(rows.loc[index, 'roc_auc_values'])
+                rows.at[index, 'stacked_feature_values'] = LDAResults.list_from_json(rows.loc[index, 'stacked_feature_values'])
+                rows.at[index, 'feature_imp_mean'] = LDAResults.list_from_json(rows.loc[index, 'feature_imp_mean'])
+                rows.at[index, 'feature_imp_sd'] = LDAResults.list_from_json(rows.loc[index, 'feature_imp_sd'])
+                rows.at[index, 'feature_description'] = LDAResults.list_from_json(rows.loc[index, 'feature_description'])
+                rows.at[index, 'lda_scores'] = LDAResults.list_from_json(rows.loc[index, 'lda_scores'])
+                rows.at[index, 'lda_scalings'] = LDAResults.list_from_json(rows.loc[index, 'lda_scalings'])
+                rows.at[index, 'lda_class_means'] = LDAResults.list_from_json(rows.loc[index, 'lda_class_means'])
+        return rows
 
 # endregion Getter

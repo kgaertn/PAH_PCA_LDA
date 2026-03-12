@@ -65,10 +65,7 @@ class AssumptionsTester:
         diff_target_axes = 0
         for target, axis, pc_index in target_axes:
             df_target_axis = df[(df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
-            #pain_group = df[(df['PRMD_ever'] == 1) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
-            #nopain_group = df[(df['PRMD_ever'] == 0) & (df['target'] == target) & (df['axis'] == axis) & (df['pc_index'] == pc_index)]['pc_score']
             statistic, p_value = st.kstest(df_target_axis, 'norm')
-            #statistic, p_value = st.ks2test(pain_group, nopain_group)
             if p_value <= 0.05:
                 print(f"Kolmogorov-Smirnov: {target}, {axis}, PC {pc_index}: Statistic: {statistic}, p-value: {p_value}")
                 diff_target_axes += 1
@@ -104,6 +101,7 @@ class AssumptionsTester:
         
     @staticmethod    
     def calculate_kaiser_meyer_olkin(df:pd.DataFrame):
+        #TODO: make sure the results are saved to a file
         """
         Calculate and print the Kaiser-Meyer-Olkin measure of sampling adequacy.
 
